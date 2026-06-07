@@ -17,7 +17,11 @@ export const metadata = {
   description: "Aggregating and hosting college events across India",
 };
 
-export default function RootLayout({ children }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#0f0f1a] text-white`}>

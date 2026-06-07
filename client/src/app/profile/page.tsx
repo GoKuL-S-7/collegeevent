@@ -93,10 +93,11 @@ export default function UserProfile() {
       setDeletingEvent(null);
       
       // Update stats
+      const statusKey = deletingEvent.status as 'approved' | 'pending' | 'rejected';
       setStats(prev => ({
         ...prev,
         total: prev.total - 1,
-        [deletingEvent.status]: prev[deletingEvent.status] - 1
+        [statusKey]: prev[statusKey] - 1
       }));
     } catch (err: any) {
       setToast({ message: err.message, type: "error" });
