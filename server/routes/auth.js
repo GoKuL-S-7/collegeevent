@@ -3,6 +3,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { checkSuspiciousActivity } = require('../utils/aiMonitor');
+const { monitorLogin } = require('../utils/suspiciousLocationMonitor');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 
@@ -102,6 +103,15 @@ router.post('/login', loginLimiter, async (req, res) => {
     const token = jwt.sign({ userId: user._id, role: user.role, username: user.username }, process.env.JWT_SECRET || 'supersecretjwt', { expiresIn: '24h' });
     
     await checkSuspiciousActivity(username, req.ip, 'login_success');
+
+    // Fire-and-forget: AI location monitoring (does NOT block the response)
+    monitorLogin({
+      userId:            user._id.toString(),
+      username:          user.username,
+      ip:                req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+      userAgent:         req.headers['user-agent'] || '',
+      deviceFingerprint: req.headers['x-device-fingerprint'] || '',
+    }).catch(() => {});
     
     res.json({ user: { username: user.username, role: user.role, location: user.location }, token });
   } catch (error) {

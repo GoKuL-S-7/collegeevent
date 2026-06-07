@@ -4,9 +4,10 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
 
-const authRoutes = require('./routes/auth');
-const eventRoutes = require('./routes/events');
-const adminRoutes = require('./routes/admin');
+const authRoutes     = require('./routes/auth');
+const eventRoutes    = require('./routes/events');
+const adminRoutes    = require('./routes/admin');
+const securityRoutes = require('./routes/security');
 
 const app = express();
 
@@ -20,9 +21,10 @@ const aiProtection = require('./middleware/aiProtection');
 app.use(aiProtection);
 
 // Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/events', eventRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/auth',     authRoutes);
+app.use('/api/events',   eventRoutes);
+app.use('/api/admin',    adminRoutes);
+app.use('/api/security', securityRoutes);
 
 mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/campusconnect')
 .then(async () => {

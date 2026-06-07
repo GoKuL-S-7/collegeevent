@@ -18,7 +18,10 @@ export default function Login() {
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "x-device-fingerprint": localStorage.getItem("deviceFingerprint") || "",
+        },
         body: JSON.stringify({ username, password }),
       }).catch(() => null);
 

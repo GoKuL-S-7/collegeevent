@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import UserActivityModal from "@/components/UserActivityModal";
 import SecurityDashboard from "@/components/SecurityDashboard";
+import AIMonitorDashboard from "@/components/AIMonitorDashboard";
 import DeleteConfirmationModal from "@/components/DeleteConfirmationModal";
 
 export default function AdminDashboard() {
@@ -46,6 +47,13 @@ export default function AdminDashboard() {
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`, { headers }),
         fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/activity-logs`, { headers })
       ]);
+
+      if (pendingRes.status === 401 || allRes.status === 401 || usersRes.status === 401 || logsRes.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/login");
+        return;
+      }
 
       if (pendingRes.ok) setPendingEvents(await pendingRes.json());
       if (allRes.ok) setAllEvents(await allRes.json());
@@ -310,9 +318,9 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* Security Dashboard Tab */}
+        {/* AI Monitoring Tab */}
         {activeTab === "security" && (
-          <SecurityDashboard />
+          <AIMonitorDashboard />
         )}
 
         {/* System Logs Tab */}

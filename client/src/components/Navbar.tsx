@@ -12,6 +12,12 @@ export default function Navbar() {
   const [user, setUser] = useState<{ username: string; role: string } | null>(null);
 
   useEffect(() => {
+    // Generate & persist a device fingerprint UUID for security monitoring
+    if (!localStorage.getItem('deviceFingerprint')) {
+      const fp = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now();
+      localStorage.setItem('deviceFingerprint', fp);
+    }
+
     const checkUser = () => {
       const userData = localStorage.getItem('user');
       if (userData) {

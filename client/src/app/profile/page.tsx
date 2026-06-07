@@ -52,6 +52,12 @@ export default function UserProfile() {
           Authorization: `Bearer ${token}`
         }
       });
+      if (res.status === 401) {
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
+        router.push("/login");
+        return;
+      }
       if (!res.ok) throw new Error("Failed to fetch activities");
       const data = await res.json();
       setMyEvents(data);
