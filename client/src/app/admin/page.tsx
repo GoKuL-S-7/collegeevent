@@ -41,10 +41,10 @@ export default function AdminDashboard() {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [pendingRes, allRes, usersRes, logsRes] = await Promise.all([
-        fetch("https://collegeevent-production-d8bc.up.railway.app/api/admin/events/pending", { headers }),
-        fetch("https://collegeevent-production-d8bc.up.railway.app/api/admin/events/all", { headers }),
-        fetch("https://collegeevent-production-d8bc.up.railway.app/api/admin/users", { headers }),
-        fetch("https://collegeevent-production-d8bc.up.railway.app/api/admin/activity-logs", { headers })
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/pending`, { headers }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/all`, { headers }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users`, { headers }),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/activity-logs`, { headers })
       ]);
 
       if (pendingRes.ok) setPendingEvents(await pendingRes.json());
@@ -61,7 +61,7 @@ export default function AdminDashboard() {
   const handleEventAction = async (id: string, status: string) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/admin/events/${id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -84,7 +84,7 @@ export default function AdminDashboard() {
     setDeleteLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/events/${deletingEvent._id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events/${deletingEvent._id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
   const handleBlockUser = async (id: string) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/admin/users/${id}/block`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${id}/block`, {
         method: "PATCH",
         headers: { Authorization: `Bearer ${token}` }
       });

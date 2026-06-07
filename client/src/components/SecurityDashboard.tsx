@@ -57,10 +57,10 @@ export default function SecurityDashboard() {
       const query = new URLSearchParams(filters as any).toString();
       
       const [actRes, statsRes] = await Promise.all([
-        fetch(`https://collegeevent-production-d8bc.up.railway.app/api/admin/suspicious-activities?${query}`, {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/suspicious-activities?${query}`, {
           headers: { Authorization: `Bearer ${token}` }
         }),
-        fetch(`https://collegeevent-production-d8bc.up.railway.app/api/admin/security-stats`, {
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/security-stats`, {
           headers: { Authorization: `Bearer ${token}` }
         })
       ]);
@@ -77,7 +77,7 @@ export default function SecurityDashboard() {
   const handleUpdateStatus = async (id: string, status: string) => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/admin/suspicious-activities/${id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/suspicious-activities/${id}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

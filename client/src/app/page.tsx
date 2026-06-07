@@ -155,9 +155,9 @@ export default function Home() {
       setLoading(true);
       try {
         const [tRes, vRes, uRes] = await Promise.all([
-          fetch("https://collegeevent-production-d8bc.up.railway.app/api/events/trending"),
-          fetch("https://collegeevent-production-d8bc.up.railway.app/api/events/virtual"),
-          fetch("https://collegeevent-production-d8bc.up.railway.app/api/events/upcoming"),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events/trending`),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events/virtual`),
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events/upcoming`),
         ]);
         if (tRes.ok) setTrending(await tRes.json());
         if (vRes.ok) setVirtual(await vRes.json());
@@ -178,7 +178,7 @@ export default function Home() {
       if (filters.category) q.append("category", filters.category);
       if (filters.mode) q.append("mode", filters.mode);
       if (filters.date) q.append("date", filters.date);
-      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/events?${q}`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events?${q}`);
       if (res.ok) {
         setFiltered(await res.json());
         setIsSearch(true);

@@ -14,7 +14,7 @@ export default function UserActivityModal({ userId, onClose }: ActivityModalProp
     const fetchActivity = async () => {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/admin/users/${userId}/activity`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/users/${userId}/activity`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         if (res.ok) {
@@ -34,7 +34,7 @@ export default function UserActivityModal({ userId, onClose }: ActivityModalProp
     
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/admin/events/${id}`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/events/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });

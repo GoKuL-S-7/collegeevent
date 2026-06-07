@@ -38,7 +38,7 @@ export default function EventCard({ event }: EventProps) {
 
         {event.posterUrl ? (
           <img
-            src={`https://collegeevent-production-d8bc.up.railway.app${event.posterUrl}`}
+            src={`${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl}`}
             alt={event.title}
             className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
           />

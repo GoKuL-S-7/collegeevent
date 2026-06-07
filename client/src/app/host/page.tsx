@@ -74,7 +74,7 @@ export default function HostEvent() {
         submitData.append('poster', poster);
       }
 
-      const res = await fetch("https://collegeevent-production-d8bc.up.railway.app/api/events", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,

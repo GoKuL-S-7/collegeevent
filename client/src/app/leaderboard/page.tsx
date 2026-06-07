@@ -50,7 +50,7 @@ export default function LeaderboardPage() {
   const fetchLeaderboard = async () => {
     setLoading(true);
     try {
-      const res = await fetch("https://collegeevent-production-d8bc.up.railway.app/api/events/leaderboard");
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/events/leaderboard`);
       if (res.ok) {
         const data = await res.json();
         setEvents(data);
@@ -248,7 +248,7 @@ function LeaderboardPodiumCard({ event, rank, color, isWinner = false }: any) {
         <div className="relative mb-6 mt-4">
           <div className={`w-32 h-32 rounded-[32px] overflow-hidden border-4 ${isWinner ? 'border-yellow-500/50' : 'border-white/10'}`}>
             <img 
-              src={event.posterUrl ? `https://collegeevent-production-d8bc.up.railway.app${event.posterUrl}` : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event'} 
+              src={event.posterUrl ? `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl}` : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event'} 
               alt={event.title}
               className="w-full h-full object-cover"
             />
@@ -295,7 +295,7 @@ function LeaderboardListRow({ event, rank }: any) {
 
         <div className="w-20 h-20 md:w-16 md:h-16 rounded-2xl overflow-hidden border border-white/5 flex-shrink-0">
           <img 
-            src={event.posterUrl ? `https://collegeevent-production-d8bc.up.railway.app${event.posterUrl}` : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event'} 
+            src={event.posterUrl ? `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl}` : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event'} 
             alt={event.title}
             className="w-full h-full object-cover"
           />
