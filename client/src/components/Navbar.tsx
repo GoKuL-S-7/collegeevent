@@ -4,7 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { LogOut, PlusCircle, User, LayoutDashboard, Home } from 'lucide-react';
 
-const API_BASE_URL = "http://localhost:5000";
+const API_BASE_URL = "https://collegeevent-production-d8bc.up.railway.app";
 
 export default function Navbar() {
   const router = useRouter();

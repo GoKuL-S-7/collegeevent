@@ -47,7 +47,7 @@ export default function EditEventModal({ event, onClose, onUpdate }: EditEventMo
         submitData.append('poster', poster);
       }
 
-      const res = await fetch(`http://localhost:5000/api/events/${event._id}`, {
+      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/events/${event._id}`, {
         method: "PUT",
         headers: {
           Authorization: `Bearer ${token}`,

@@ -47,7 +47,7 @@ export default function UserProfile() {
   const fetchMyEvents = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch("http://localhost:5000/api/events/my-events", {
+      const res = await fetch("https://collegeevent-production-d8bc.up.railway.app/api/events/my-events", {
         headers: {
           Authorization: `Bearer ${token}`
         }
@@ -76,7 +76,7 @@ export default function UserProfile() {
     setDeleteLoading(true);
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5000/api/events/${deletingEvent._id}`, {
+      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/events/${deletingEvent._id}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`

@@ -31,14 +31,14 @@ export default function Signup() {
 
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/auth/signup", {
+      const res = await fetch("https://collegeevent-production-d8bc.up.railway.app/api/auth/signup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
       }).catch(() => null);
 
       if (!res) {
-        throw new Error("Backend server is not responding. Please ensure the server is running on port 5000.");
+        throw new Error("Backend server is not responding. Please try again later or check your network connection.");
       }
 
       const data = await res.json();

@@ -13,7 +13,7 @@ export default function SetupAdmin() {
   useEffect(() => {
     const checkAdmin = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/auth/check-admin").catch(() => null);
+        const res = await fetch("https://collegeevent-production-d8bc.up.railway.app/api/auth/check-admin").catch(() => null);
         if (res && res.ok) {
           const data = await res.json();
           if (data.adminExists) {
@@ -39,7 +39,7 @@ export default function SetupAdmin() {
     setError("");
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/setup-admin", {
+      const res = await fetch("https://collegeevent-production-d8bc.up.railway.app/api/auth/setup-admin", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password }),

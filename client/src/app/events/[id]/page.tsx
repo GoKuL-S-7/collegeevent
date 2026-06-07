@@ -16,13 +16,13 @@ export default function EventDetailsPage() {
   useEffect(() => {
     const fetchEvent = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/events/${params.id}`);
+        const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/events/${params.id}`);
         if (!res.ok) throw new Error("Event not found");
         const data = await res.json();
         setEvent(data);
         
         // Track view
-        fetch(`http://localhost:5000/api/events/${params.id}/view`, { method: "POST" });
+        fetch(`https://collegeevent-production-d8bc.up.railway.app/api/events/${params.id}/view`, { method: "POST" });
       } catch (err: any) {
         setError("Failed to load event details.");
       } finally {
@@ -39,7 +39,7 @@ export default function EventDetailsPage() {
         router.push("/login");
         return;
       }
-      const res = await fetch(`http://localhost:5000/api/events/${event._id}/like`, {
+      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/events/${event._id}/like`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` }
       });
@@ -62,7 +62,7 @@ export default function EventDetailsPage() {
         return;
       }
 
-      const res = await fetch(`http://localhost:5000/api/events/${event._id}/register`, {
+      const res = await fetch(`https://collegeevent-production-d8bc.up.railway.app/api/events/${event._id}/register`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -137,7 +137,7 @@ export default function EventDetailsPage() {
               <div className="relative h-96 w-full">
                 {event.posterUrl ? (
                   <img 
-                    src={`http://localhost:5000${event.posterUrl}`} 
+                    src={`https://collegeevent-production-d8bc.up.railway.app${event.posterUrl}`} 
                     alt={event.title}
                     className="absolute inset-0 w-full h-full object-cover opacity-60"
                   />
