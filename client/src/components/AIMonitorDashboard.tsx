@@ -345,8 +345,7 @@ export default function AIMonitorDashboard() {
             <tr className="bg-white/10 text-gray-400 text-[10px] uppercase tracking-wider">
               <th className="px-4 py-3">Username</th>
               <th className="px-4 py-3">IP Address</th>
-              <th className="px-4 py-3">Country</th>
-              <th className="px-4 py-3">City</th>
+              <th className="px-4 py-3">Location</th>
               <th className="px-4 py-3">Alert Type</th>
               <th className="px-4 py-3">Risk Score</th>
               <th className="px-4 py-3">Severity</th>
@@ -359,7 +358,7 @@ export default function AIMonitorDashboard() {
             {/* Loading */}
             {loading && (
               <tr>
-                <td colSpan={9} className="text-center py-12">
+                <td colSpan={8} className="text-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500 mx-auto" />
                 </td>
               </tr>
@@ -368,7 +367,7 @@ export default function AIMonitorDashboard() {
             {/* Empty */}
             {!loading && alerts.length === 0 && (
               <tr>
-                <td colSpan={9} className="text-center py-12 text-gray-500">
+                <td colSpan={8} className="text-center py-12 text-gray-500">
                   No suspicious activities detected.
                 </td>
               </tr>
@@ -397,14 +396,11 @@ export default function AIMonitorDashboard() {
                       {alert.ipAddress}
                     </td>
 
-                    {/* Country */}
+                    {/* Location */}
                     <td className="px-4 py-3 text-sm text-gray-300">
-                      {alert.country && alert.country !== 'Unknown' && alert.country !== 'Local' ? alert.country : 'Location Unavailable'}
-                    </td>
-
-                    {/* City */}
-                    <td className="px-4 py-3 text-sm text-gray-300">
-                      {alert.city && alert.city !== 'Unknown' && alert.city !== 'Local' ? alert.city : 'Location Unavailable'}
+                      {alert.city && alert.country && alert.city !== 'Unknown' && alert.country !== 'Unknown' && alert.city !== 'Local' && alert.country !== 'Local'
+                        ? `${alert.city}, ${alert.country}`
+                        : 'Location Unavailable'}
                     </td>
 
                     {/* Alert Type */}
@@ -480,7 +476,7 @@ export default function AIMonitorDashboard() {
                       key={`${alert._id}-detail`}
                       className="bg-black/40 border-l-4 border-purple-500"
                     >
-                      <td colSpan={9} className="p-6">
+                      <td colSpan={8} className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           {/* Description */}
                           <div>

@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { checkSuspiciousActivity } = require('../utils/aiMonitor');
 const { monitorLogin } = require('../utils/suspiciousLocationMonitor');
+const { getClientIp } = require('../utils/ipExtractor');
 const rateLimit = require('express-rate-limit');
 const router = express.Router();
 
@@ -69,7 +70,8 @@ router.post('/signup', async (req, res) => {
     const user = new User({ username, password: hashedPassword, location, role: role || 'user' });
     await user.save();
 
-    await checkSuspiciousActivity(username, req.ip, 'signup');
+    const clientIp = getClientIp(req);
+    await checkSuspiciousActivity(username, clientIp, 'signup');
 
     res.status(201).json({ message: 'User created successfully.' });
   } catch (error) {
@@ -79,11 +81,13 @@ router.post('/signup', async (req, res) => {
 
 router.post('/login', loginLimiter, async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, latitude, longitude } = req.body;
     const user = await User.findOne({ username });
     
+    const clientIp = getClientIp(req);
+    
     if (!user) {
-      if (username) await checkSuspiciousActivity(username, req.ip, 'login_failed');
+      if (username) await checkSuspiciousActivity(username, clientIp, 'login_failed');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
@@ -93,19 +97,25 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      await checkSuspiciousActivity(username, req.ip, 'login_failed');
+      await checkSuspiciousActivity(username, clientIp, 'login_failed');
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
     const { getGeoInfo } = require('../utils/suspiciousLocationMonitor');
-    const geo = await getGeoInfo(req.ip || req.headers['x-forwarded-for'] || '127.0.0.1');
+    const geo = await getGeoInfo(clientIp);
 
     user.ipAddress = geo.ip;
     user.country = geo.country;
     user.region = geo.region;
     user.city = geo.city;
-    user.latitude = geo.latitude;
-    user.longitude = geo.longitude;
+    
+    if (typeof latitude === 'number' && typeof longitude === 'number' && latitude !== 0 && longitude !== 0) {
+      user.latitude = latitude;
+      user.longitude = longitude;
+    } else {
+      user.latitude = geo.latitude;
+      user.longitude = geo.longitude;
+    }
     user.lastLogin = new Date();
     
     if (geo.city === 'Unknown' || geo.country === 'Unknown' || geo.city === 'Local' || geo.country === 'Local') {
@@ -118,15 +128,17 @@ router.post('/login', loginLimiter, async (req, res) => {
 
     const token = jwt.sign({ userId: user._id, role: user.role, username: user.username }, process.env.JWT_SECRET || 'supersecretjwt', { expiresIn: '24h' });
     
-    await checkSuspiciousActivity(username, req.ip, 'login_success');
+    await checkSuspiciousActivity(username, clientIp, 'login_success');
 
     // Fire-and-forget: AI location monitoring (does NOT block the response)
     monitorLogin({
       userId:            user._id.toString(),
       username:          user.username,
-      ip:                req.ip || req.headers['x-forwarded-for'] || '127.0.0.1',
+      ip:                clientIp,
       userAgent:         req.headers['user-agent'] || '',
       deviceFingerprint: req.headers['x-device-fingerprint'] || '',
+      latitude:          typeof latitude === 'number' ? latitude : null,
+      longitude:         typeof longitude === 'number' ? longitude : null
     }).catch(() => {});
     
     res.json({ user: { username: user.username, role: user.role, location: user.location }, token });

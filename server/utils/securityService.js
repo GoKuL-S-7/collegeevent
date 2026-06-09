@@ -4,6 +4,7 @@ const ipLib = require('ip');
 const dns = require('dns').promises;
 const SuspiciousActivity = require('../models/SuspiciousActivity');
 const User = require('../models/User');
+const { isPrivateOrInternalIp } = require('./ipExtractor');
 
 const SCORING = {
   VPN_LOGIN: 30,
@@ -40,7 +41,7 @@ const SUSPICIOUS_TLDS = ['.xyz', '.top', '.click', '.buzz', '.online', '.site', 
 
 const getLocationInfo = async (ip) => {
   try {
-    if (ip === '::1' || ip === '127.0.0.1' || ip.startsWith('192.168.') || ip.startsWith('10.')) {
+    if (!ip || isPrivateOrInternalIp(ip)) {
       return { city: 'Localhost', country: 'Local', isVPN: false };
     }
     const response = await axios.get(`https://ipapi.co/${ip}/json/`);

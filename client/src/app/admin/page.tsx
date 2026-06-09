@@ -325,7 +325,9 @@ export default function AdminDashboard() {
                             {user.role}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm">{user.location || 'N/A'}</td>
+                        <td className="px-6 py-4 text-sm">
+                          {user.location && user.location !== 'N/A' && user.location !== 'Localhost, Local' && user.location !== 'Unknown, Unknown' ? user.location : 'Location Unavailable'}
+                        </td>
                         <td className="px-6 py-4">
                           {user.isSuspicious ? (
                             <span className="text-red-400 bg-red-400/10 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider border border-red-500/20">Suspicious</span>
@@ -379,7 +381,7 @@ export default function AdminDashboard() {
                     </span>
                   </div>
                   <div className="text-gray-400 text-sm mt-1">
-                    <span className="text-white">{log.username}</span> • IP: {log.ipAddress} • {new Date(log.timestamp).toLocaleString()}
+                    <span className="text-white">{log.username}</span> • IP: {log.ipAddress} • Location: {log.location && log.location !== 'Unknown' && log.location !== 'Unknown, Unknown' && log.location !== 'Localhost, Local' ? log.location : 'Location Unavailable'} • {new Date(log.timestamp).toLocaleString()}
                   </div>
                   {log.details && <div className="text-red-300/80 text-sm mt-2 bg-red-500/10 p-2 rounded">{log.details}</div>}
                 </div>

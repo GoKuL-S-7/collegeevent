@@ -58,15 +58,29 @@ const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata
     }
     
     // Update user location for next check
-    await User.findOneAndUpdate({ username }, { location: `${location.city}, ${location.country}` });
+    let formattedLocation = 'Location Unavailable';
+    if (location && location.city && location.country && 
+        location.city !== 'Unknown' && location.country !== 'Unknown' && 
+        location.city !== 'Local' && location.country !== 'Local' && 
+        location.city !== 'Localhost') {
+      formattedLocation = `${location.city}, ${location.country}`;
+    }
+    await User.findOneAndUpdate({ username }, { location: formattedLocation });
   }
 
   // Log to general ActivityLog for the "System Logs" tab
   const ActivityLog = require('../models/ActivityLog');
+  let formattedLogLocation = 'Location Unavailable';
+  if (location && location.city && location.country && 
+      location.city !== 'Unknown' && location.country !== 'Unknown' && 
+      location.city !== 'Local' && location.country !== 'Local' && 
+      location.city !== 'Localhost') {
+    formattedLogLocation = `${location.city}, ${location.country}`;
+  }
   await ActivityLog.create({
     username: username || 'anonymous',
     ipAddress,
-    location: `${location.city}, ${location.country}`,
+    location: formattedLogLocation,
     activityType: actionType,
     status: 'normal'
   });

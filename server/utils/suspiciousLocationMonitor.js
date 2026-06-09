@@ -14,6 +14,7 @@ const axios     = require('axios');
 const UserSession   = require('../models/UserSession');
 const SecurityAlert = require('../models/SecurityAlert');
 const User          = require('../models/User');
+const { isPrivateOrInternalIp } = require('./ipExtractor');
 
 // ─── Haversine distance (km) ────────────────────────────────────────────────
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -33,10 +34,10 @@ async function getGeoInfo(ip) {
   let targetIp = ip;
   
   // If the IP is a local or private IP, try to discover our public IP using ipify
-  if (!targetIp || /^(::1|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(targetIp)) {
+  if (!targetIp || isPrivateOrInternalIp(targetIp)) {
     try {
       const { data } = await axios.get('https://api.ipify.org?format=json', { timeout: 3000 });
-      if (data && data.ip) {
+      if (data && data.ip && !isPrivateOrInternalIp(data.ip)) {
         targetIp = data.ip;
       }
     } catch (err) {
@@ -45,12 +46,12 @@ async function getGeoInfo(ip) {
   }
 
   // Skip if still local
-  if (!targetIp || /^(::1|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(targetIp)) {
+  if (!targetIp || isPrivateOrInternalIp(targetIp)) {
     return {
       ip: targetIp || '127.0.0.1',
-      country: 'Local',
-      region: 'Local',
-      city: 'Local',
+      country: 'Unknown',
+      region: 'Unknown',
+      city: 'Unknown',
       latitude: 0,
       longitude: 0,
       org: '',
@@ -168,9 +169,15 @@ function severityFromScore(score) {
  * @param {string} opts.userAgent
  * @param {string} opts.deviceFingerprint
  */
-async function monitorLogin({ userId, username, ip, userAgent = '', deviceFingerprint = '' }) {
+async function monitorLogin({ userId, username, ip, userAgent = '', deviceFingerprint = '', latitude = null, longitude = null }) {
   try {
     const geo   = await module.exports.getGeoInfo(ip);
+    
+    // Override with GPS coordinates if provided by client
+    if (typeof latitude === 'number' && typeof longitude === 'number' && latitude !== 0 && longitude !== 0) {
+      geo.latitude = latitude;
+      geo.longitude = longitude;
+    }
     const now   = new Date();
     const alerts = [];
     let totalScore = 0;

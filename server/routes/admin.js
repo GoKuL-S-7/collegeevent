@@ -4,6 +4,7 @@ const Event = require('../models/Event');
 const ActivityLog = require('../models/ActivityLog');
 const { auth, isAdmin } = require('../middleware/auth');
 const { checkRegistrationLinkSecurity } = require('../utils/aiMonitor');
+const { getClientIp } = require('../utils/ipExtractor');
 const router = express.Router();
 
 router.use(auth, isAdmin);
@@ -54,6 +55,13 @@ router.get('/users/:id/activity', async (req, res) => {
 
     res.json({
       username: user.username,
+      ipAddress: user.ipAddress,
+      country: user.country,
+      region: user.region,
+      city: user.city,
+      latitude: user.latitude,
+      longitude: user.longitude,
+      lastLogin: user.lastLogin,
       hostedEvents,
       registeredEvents
     });
@@ -93,7 +101,8 @@ router.put('/events/:id', async (req, res) => {
     if (!event) return res.status(404).json({ error: 'Event not found' });
 
     if (status === 'approved') {
-      checkRegistrationLinkSecurity(event, req.ip, req.user).catch(err => console.error("Link analysis error:", err));
+      const clientIp = getClientIp(req);
+      checkRegistrationLinkSecurity(event, clientIp, req.user).catch(err => console.error("Link analysis error:", err));
     }
 
     res.json({ message: `Event ${status} successfully`, event });

@@ -3,6 +3,7 @@ const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const { auth } = require('../middleware/auth');
 const { checkSuspiciousActivity, checkRegistrationLinkSecurity } = require('../utils/aiMonitor');
+const { getClientIp } = require('../utils/ipExtractor');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
@@ -27,14 +28,15 @@ const upload = multer({
 
 // Helper for security analysis
 const runSecurityAnalysis = async (req, eventData) => {
+  const clientIp = getClientIp(req);
   const organizerContext = `${eventData.collegeName} ${eventData.hostName || ''}`;
   const trustAnalysis = await analyzeEventTrust(eventData.title, organizerContext, eventData.registrationLink || '');
   
   if (trustAnalysis.riskLevel === 'Critical' || trustAnalysis.riskLevel === 'Warning') {
-    const location = await getLocationInfo(req.ip);
+    const location = await getLocationInfo(clientIp);
     await logSuspiciousActivity({
       username: req.user.username,
-      ipAddress: req.ip,
+      ipAddress: clientIp,
       location,
       activityType: 'MALICIOUS_LINK_DETECTION',
       additionalScore: trustAnalysis.anomalyScore,
@@ -120,7 +122,8 @@ router.post('/', auth, upload.single('poster'), async (req, res) => {
       return res.status(403).json({ error: 'Admins cannot host events. Please use a user or host account.' });
     }
 
-    const isSpam = await checkSuspiciousActivity(req.user.username, req.ip, 'event_submission');
+    const clientIp = getClientIp(req);
+    const isSpam = await checkSuspiciousActivity(req.user.username, clientIp, 'event_submission');
     if (isSpam) {
       return res.status(429).json({ error: 'Too many submissions. Your account has been flagged.' });
     }
@@ -146,7 +149,7 @@ router.post('/', auth, upload.single('poster'), async (req, res) => {
     await event.save();
 
     // Run link security analysis asynchronously
-    checkRegistrationLinkSecurity(event, req.ip, req.user).catch(err => console.error("Link analysis error:", err));
+    checkRegistrationLinkSecurity(event, clientIp, req.user).catch(err => console.error("Link analysis error:", err));
 
     const user = await User.findById(req.user.userId);
     if (user && user.role === 'user') {
@@ -282,7 +285,8 @@ router.put('/:id', auth, upload.single('poster'), async (req, res) => {
     const updatedEvent = await Event.findByIdAndUpdate(req.params.id, updateData, { new: true });
     
     // Run link security analysis asynchronously
-    checkRegistrationLinkSecurity(updatedEvent, req.ip, req.user).catch(err => console.error("Link analysis error:", err));
+    const clientIp = getClientIp(req);
+    checkRegistrationLinkSecurity(updatedEvent, clientIp, req.user).catch(err => console.error("Link analysis error:", err));
     
     res.json({ message: 'Event updated successfully. Pending re-approval.', event: updatedEvent });
   } catch (error) {

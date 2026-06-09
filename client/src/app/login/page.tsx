@@ -15,39 +15,56 @@ export default function Login() {
     setLoading(true);
     setError("");
 
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-device-fingerprint": localStorage.getItem("deviceFingerprint") || "",
+    const loginUser = async (latitude: number | null = null, longitude: number | null = null) => {
+      try {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-device-fingerprint": localStorage.getItem("deviceFingerprint") || "",
+          },
+          body: JSON.stringify({ username, password, latitude, longitude }),
+        }).catch(() => null);
+
+        if (!res) {
+          throw new Error("Backend server is not responding. Please try again later or check your network connection.");
+        }
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          throw new Error(data.error || "Login failed");
+        }
+
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("user", JSON.stringify(data.user));
+        window.dispatchEvent(new Event("authChange"));
+
+        if (data.user.role === "admin") {
+          router.push("/admin");
+        } else {
+          router.push("/");
+        }
+      } catch (err: any) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          loginUser(position.coords.latitude, position.coords.longitude);
         },
-        body: JSON.stringify({ username, password }),
-      }).catch(() => null);
-
-      if (!res) {
-        throw new Error("Backend server is not responding. Please try again later or check your network connection.");
-      }
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.error || "Login failed");
-      }
-
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
-      window.dispatchEvent(new Event("authChange"));
-
-      if (data.user.role === "admin") {
-        router.push("/admin");
-      } else {
-        router.push("/");
-      }
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
+        () => {
+          // Fallback to IP-based geolocation on error or denial
+          loginUser(null, null);
+        },
+        { timeout: 5000 }
+      );
+    } else {
+      loginUser(null, null);
     }
   };
 
