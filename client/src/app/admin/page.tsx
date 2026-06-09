@@ -26,8 +26,8 @@ export default function AdminDashboard() {
     if (url.startsWith('http')) return url;
     const cleanPath = url.startsWith('/') ? url : '/' + url;
     let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
-    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
-      baseUrl = 'http://localhost:5000';
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1);
     }
     return `${baseUrl}${cleanPath}`;
   };

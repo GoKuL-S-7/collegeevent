@@ -13,7 +13,60 @@ router.use(auth, isAdmin);
 router.get('/users', async (req, res) => {
   try {
     const users = await User.find().select('-password').sort({ createdAt: -1 });
-    res.json(users);
+    
+    // Fallback location resolution from logs/sessions
+    const UserSession = require('../models/UserSession');
+    
+    const usersWithLocation = await Promise.all(users.map(async (u) => {
+      const userObj = u.toObject();
+      
+      const hasInvalidLocation = !userObj.location || 
+        userObj.location === 'Unknown, Unknown' || 
+        userObj.location === 'Localhost, Local' || 
+        userObj.location === 'N/A' ||
+        userObj.location === 'Unknown' ||
+        userObj.location === 'Location Unavailable';
+        
+      if (hasInvalidLocation) {
+        // 1. Try to reuse location from latest UserSession
+        const latestSession = await UserSession.findOne({
+          username: userObj.username,
+          location: { $exists: true, $ne: null, $nin: ['', 'Unknown', 'Unknown, Unknown', 'Localhost, Local', 'N/A', 'Location Unavailable'] }
+        }).sort({ loginTime: -1 });
+        
+        if (latestSession) {
+          userObj.location = latestSession.location;
+          userObj.district = latestSession.district || userObj.district;
+          userObj.state = latestSession.state || userObj.state;
+          userObj.country = latestSession.country || userObj.country;
+        } else {
+          // 2. Try to reuse location from latest ActivityLog
+          const latestLog = await ActivityLog.findOne({
+            username: userObj.username,
+            location: { $exists: true, $ne: null, $nin: ['', 'Unknown', 'Unknown, Unknown', 'Localhost, Local', 'N/A', 'Location Unavailable'] }
+          }).sort({ timestamp: -1 });
+          
+          if (latestLog) {
+            userObj.location = latestLog.location;
+            userObj.district = latestLog.district || userObj.district;
+            userObj.state = latestLog.state || userObj.state;
+            userObj.country = latestLog.country || userObj.country;
+          }
+        }
+      }
+      
+      // Ensure we display 'Location Unavailable' instead of 'Unknown, Unknown' if it fails
+      if (!userObj.location || 
+          userObj.location === 'Unknown, Unknown' || 
+          userObj.location === 'N/A' ||
+          userObj.location === 'Unknown') {
+        userObj.location = 'Location Unavailable';
+      }
+      
+      return userObj;
+    }));
+
+    res.json(usersWithLocation);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
