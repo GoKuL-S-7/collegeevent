@@ -39,8 +39,12 @@ const securityAlertSchema = new mongoose.Schema({
   score:       { type: Number, default: 0 },
   // Location at time of alert
   ipAddress:   { type: String },
+  location:    { type: String },
   country:     { type: String },
   city:        { type: String },
+  district:    { type: String },
+  state:       { type: String },
+  locationSource: { type: String },
   latitude:    { type: Number },
   longitude:   { type: Number },
   // Extra context

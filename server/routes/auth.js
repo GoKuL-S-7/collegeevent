@@ -101,28 +101,26 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    const { getGeoInfo } = require('../utils/suspiciousLocationMonitor');
-    const geo = await getGeoInfo(clientIp);
+    const { getGeoInfo, formatLocationText } = require('../utils/suspiciousLocationMonitor');
+    const geo = await getGeoInfo(clientIp, latitude, longitude);
+
+    if (typeof latitude === 'number' && typeof longitude === 'number' && latitude !== 0 && longitude !== 0 && geo.locationSource !== 'GPS') {
+      geo.latitude = Number(latitude);
+      geo.longitude = Number(longitude);
+      geo.locationSource = 'GPS';
+    }
 
     user.ipAddress = geo.ip;
-    user.country = geo.country;
-    user.region = geo.region;
-    user.city = geo.city;
-    
-    if (typeof latitude === 'number' && typeof longitude === 'number' && latitude !== 0 && longitude !== 0) {
-      user.latitude = latitude;
-      user.longitude = longitude;
-    } else {
-      user.latitude = geo.latitude;
-      user.longitude = geo.longitude;
-    }
+    user.country = geo.country || 'Unknown';
+    user.region = geo.region || geo.state || 'Unknown';
+    user.city = geo.city || geo.district || 'Unknown';
+    user.district = geo.district;
+    user.state = geo.state;
+    user.locationSource = geo.locationSource;
+    user.latitude = geo.latitude;
+    user.longitude = geo.longitude;
     user.lastLogin = new Date();
-    
-    if (geo.city === 'Unknown' || geo.country === 'Unknown' || geo.city === 'Local' || geo.country === 'Local') {
-      user.location = 'Location Unavailable';
-    } else {
-      user.location = `${geo.city}, ${geo.country}`;
-    }
+    user.location = formatLocationText(geo);
     
     await user.save();
 

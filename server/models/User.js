@@ -42,6 +42,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: '',
   },
+  district: {
+    type: String,
+    default: '',
+  },
+  state: {
+    type: String,
+    default: '',
+  },
+  locationSource: {
+    type: String,
+    default: '',
+  },
   latitude: {
     type: Number,
     default: 0,

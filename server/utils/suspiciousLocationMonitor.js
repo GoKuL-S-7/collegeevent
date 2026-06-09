@@ -29,10 +29,71 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+// ─── Location Formatting helper ──────────────────────────────────────────────
+function formatLocationText({ district, state, country }) {
+  if (district && state) {
+    return `${district}, ${state}`;
+  }
+  if (state && country) {
+    return `${state}, ${country}`;
+  }
+  return 'Location Unavailable';
+}
+
+// ─── Reverse Geocoding helper ────────────────────────────────────────────────
+async function reverseGeocode(lat, lon) {
+  try {
+    const response = await axios.get('https://nominatim.openstreetmap.org/reverse', {
+      params: {
+        lat,
+        lon,
+        format: 'jsonv2',
+        addressdetails: 1
+      },
+      headers: {
+        'User-Agent': 'CampusConnect-SecurityMonitor/2.0 (contact@campusconnect.edu)'
+      },
+      timeout: 3000
+    });
+    if (response.data && response.data.address) {
+      const addr = response.data.address;
+      return {
+        district: addr.state_district || addr.county || addr.district || addr.city_district || addr.suburb,
+        state: addr.state,
+        country: addr.country
+      };
+    }
+  } catch (err) {
+    console.error('[ReverseGeocode] Error:', err.message);
+  }
+  return null;
+}
+
 // ─── IP Geolocation ─────────────────────────────────────────────────────────
-async function getGeoInfo(ip) {
+async function getGeoInfo(ip, gpsLat = null, gpsLon = null) {
   let targetIp = ip;
   
+  // 1. If we have GPS coordinates, we reverse geocode them immediately
+  if (gpsLat && gpsLon && gpsLat !== 0 && gpsLon !== 0) {
+    const geoDetails = await reverseGeocode(gpsLat, gpsLon);
+    if (geoDetails) {
+      return {
+        ip: targetIp || '127.0.0.1',
+        district: geoDetails.district,
+        state: geoDetails.state,
+        country: geoDetails.country,
+        latitude: Number(gpsLat),
+        longitude: Number(gpsLon),
+        locationSource: 'GPS',
+        vpn: false,
+        proxy: false,
+        tor: false,
+        org: 'GPS'
+      };
+    }
+  }
+
+  // 2. If no GPS, do IP-based lookup
   // If the IP is a local or private IP, try to discover our public IP using ipify
   if (!targetIp || isPrivateOrInternalIp(targetIp)) {
     try {
@@ -49,15 +110,16 @@ async function getGeoInfo(ip) {
   if (!targetIp || isPrivateOrInternalIp(targetIp)) {
     return {
       ip: targetIp || '127.0.0.1',
-      country: 'Unknown',
-      region: 'Unknown',
-      city: 'Unknown',
+      district: undefined,
+      state: undefined,
+      country: undefined,
       latitude: 0,
       longitude: 0,
-      org: '',
+      locationSource: 'IP',
       vpn: false,
       proxy: false,
-      tor: false
+      tor: false,
+      org: ''
     };
   }
 
@@ -81,15 +143,16 @@ async function getGeoInfo(ip) {
     return c;
   };
 
-  // 1. Try ipapi.co
+  let rawGeo = null;
+
+  // Try ipapi.co
   try {
     const { data } = await axios.get(`https://ipapi.co/${targetIp}/json/`, { timeout: 4000 });
     if (data && !data.error) {
-      return {
+      rawGeo = {
         ip: data.ip || targetIp,
         country: cleanCountryName(data.country_name),
         region: data.region || 'Unknown',
-        city: data.city || 'Unknown',
         latitude: data.latitude || 0,
         longitude: data.longitude || 0,
         org: data.org || '',
@@ -102,39 +165,57 @@ async function getGeoInfo(ip) {
     // Try fallback to ipinfo.io
   }
 
-  // 2. Try ipinfo.io
-  try {
-    const { data } = await axios.get(`https://ipinfo.io/${targetIp}/json`, { timeout: 4000 });
-    if (data && !data.error) {
-      const [lat, lon] = (data.loc || '0,0').split(',').map(Number);
-      return {
-        ip: data.ip || targetIp,
-        country: cleanCountryName(data.country),
-        region: data.region || 'Unknown',
-        city: data.city || 'Unknown',
-        latitude: lat || 0,
-        longitude: lon || 0,
-        org: data.org || '',
-        vpn: false,
-        proxy: false,
-        tor: false
-      };
+  // Try ipinfo.io
+  if (!rawGeo) {
+    try {
+      const { data } = await axios.get(`https://ipinfo.io/${targetIp}/json`, { timeout: 4000 });
+      if (data && !data.error) {
+        const [lat, lon] = (data.loc || '0,0').split(',').map(Number);
+        rawGeo = {
+          ip: data.ip || targetIp,
+          country: cleanCountryName(data.country),
+          region: data.region || 'Unknown',
+          latitude: lat || 0,
+          longitude: lon || 0,
+          org: data.org || '',
+          vpn: false,
+          proxy: false,
+          tor: false
+        };
+      }
+    } catch (err) {
+      // Ignore
     }
-  } catch (err) {
-    // Ignore
+  }
+
+  if (rawGeo) {
+    return {
+      ip: rawGeo.ip,
+      district: undefined, // Discard city/district on IP lookup to avoid low confidence guesses
+      state: rawGeo.region,
+      country: rawGeo.country,
+      latitude: rawGeo.latitude,
+      longitude: rawGeo.longitude,
+      locationSource: 'IP',
+      vpn: rawGeo.vpn,
+      proxy: rawGeo.proxy,
+      tor: rawGeo.tor,
+      org: rawGeo.org
+    };
   }
 
   return {
     ip: targetIp,
-    country: 'Unknown',
-    region: 'Unknown',
-    city: 'Unknown',
+    district: undefined,
+    state: undefined,
+    country: undefined,
     latitude: 0,
     longitude: 0,
-    org: '',
+    locationSource: 'IP',
     vpn: false,
     proxy: false,
-    tor: false
+    tor: false,
+    org: ''
   };
 }
 
@@ -171,12 +252,13 @@ function severityFromScore(score) {
  */
 async function monitorLogin({ userId, username, ip, userAgent = '', deviceFingerprint = '', latitude = null, longitude = null }) {
   try {
-    const geo   = await module.exports.getGeoInfo(ip);
+    const geo   = await module.exports.getGeoInfo(ip, latitude, longitude);
     
-    // Override with GPS coordinates if provided by client
-    if (typeof latitude === 'number' && typeof longitude === 'number' && latitude !== 0 && longitude !== 0) {
-      geo.latitude = latitude;
-      geo.longitude = longitude;
+    // Fallback coordinates override if GPS was passed but IP-based lookup was returned
+    if (typeof latitude === 'number' && typeof longitude === 'number' && latitude !== 0 && longitude !== 0 && geo.locationSource !== 'GPS') {
+      geo.latitude = Number(latitude);
+      geo.longitude = Number(longitude);
+      geo.locationSource = 'GPS';
     }
     const now   = new Date();
     const alerts = [];
@@ -308,9 +390,13 @@ async function monitorLogin({ userId, username, ip, userAgent = '', deviceFinger
       userId,
       username,
       ipAddress:         ip,
+      location:          formatLocationText(geo),
       country:           geo.country,
       region:            geo.region,
       city:              geo.city,
+      district:          geo.district,
+      state:             geo.state,
+      locationSource:    geo.locationSource,
       latitude:          geo.latitude,
       longitude:         geo.longitude,
       deviceFingerprint,
@@ -337,8 +423,12 @@ async function monitorLogin({ userId, username, ip, userAgent = '', deviceFinger
         severity,
         score:       scoreVal,
         ipAddress:   ip,
+        location:    formatLocationText(geo),
         country:     geo.country,
         city:        geo.city,
+        district:    geo.district,
+        state:       geo.state,
+        locationSource: geo.locationSource,
         latitude:    geo.latitude,
         longitude:   geo.longitude,
         metadata:    a.metadata || {},
@@ -377,8 +467,12 @@ async function monitorLogin({ userId, username, ip, userAgent = '', deviceFinger
           severity,
           score,
           ipAddress: ip,
+          location: formatLocationText(geo),
           country: geo.country,
           city: geo.city,
+          district: geo.district,
+          state: geo.state,
+          locationSource: geo.locationSource,
           latitude: geo.latitude,
           longitude: geo.longitude,
           metadata: {
@@ -411,4 +505,4 @@ async function touchSession(userId) {
   } catch { /* silent */ }
 }
 
-module.exports = { monitorLogin, touchSession, getGeoInfo };
+module.exports = { monitorLogin, touchSession, getGeoInfo, formatLocationText };

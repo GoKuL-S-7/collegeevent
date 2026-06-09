@@ -15,6 +15,10 @@ interface SecurityAlert {
   severity: "Low" | "Medium" | "High" | "Critical";
   score: number;
   ipAddress: string;
+  location?: string;
+  district?: string;
+  state?: string;
+  locationSource?: string;
   country: string;
   city: string;
   latitude: number;
@@ -398,9 +402,7 @@ export default function AIMonitorDashboard() {
 
                     {/* Location */}
                     <td className="px-4 py-3 text-sm text-gray-300">
-                      {alert.city && alert.country && alert.city !== 'Unknown' && alert.country !== 'Unknown' && alert.city !== 'Local' && alert.country !== 'Local'
-                        ? `${alert.city}, ${alert.country}`
-                        : 'Location Unavailable'}
+                      {alert.location || 'Location Unavailable'}
                     </td>
 
                     {/* Alert Type */}

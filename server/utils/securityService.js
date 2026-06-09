@@ -41,19 +41,30 @@ const SUSPICIOUS_TLDS = ['.xyz', '.top', '.click', '.buzz', '.online', '.site', 
 
 const getLocationInfo = async (ip) => {
   try {
-    if (!ip || isPrivateOrInternalIp(ip)) {
-      return { city: 'Localhost', country: 'Local', isVPN: false };
-    }
-    const response = await axios.get(`https://ipapi.co/${ip}/json/`);
-    if (response.data) {
-      return {
-        city: response.data.city || 'Unknown',
-        country: response.data.country_name || 'Unknown',
-        isVPN: response.data.proxy || false
-      };
-    }
-  } catch (error) {}
-  return { city: 'Unknown', country: 'Unknown', isVPN: false };
+    const { getGeoInfo } = require('./suspiciousLocationMonitor');
+    const geo = await getGeoInfo(ip);
+    return {
+      city: geo.district || geo.state || 'Unknown',
+      country: geo.country || 'Unknown',
+      district: geo.district,
+      state: geo.state,
+      locationSource: geo.locationSource,
+      latitude: geo.latitude,
+      longitude: geo.longitude,
+      isVPN: geo.vpn || geo.proxy
+    };
+  } catch (error) {
+    return {
+      city: 'Unknown',
+      country: 'Unknown',
+      district: undefined,
+      state: undefined,
+      locationSource: 'IP',
+      latitude: 0,
+      longitude: 0,
+      isVPN: false
+    };
+  }
 };
 
 const getRiskLevel = (score) => {

@@ -5,9 +5,13 @@ const userSessionSchema = new mongoose.Schema({
   username:          { type: String, required: true },
   ipAddress:         { type: String, required: true },
   // Geolocation
+  location:          { type: String, default: '' },
   country:           { type: String, default: 'Unknown' },
   region:            { type: String, default: 'Unknown' },
   city:              { type: String, default: 'Unknown' },
+  district:          { type: String, default: '' },
+  state:             { type: String, default: '' },
+  locationSource:    { type: String, default: '' },
   latitude:          { type: Number, default: 0 },
   longitude:         { type: Number, default: 0 },
   // Device

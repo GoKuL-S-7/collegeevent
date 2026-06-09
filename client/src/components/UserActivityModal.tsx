@@ -72,7 +72,7 @@ export default function UserActivityModal({ userId, onClose }: ActivityModalProp
 
         {/* Security Profile & Session Details */}
         {activity && (
-          <div className="mb-8 bg-white/5 border border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+          <div className="mb-8 bg-white/5 border border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-6 gap-4">
             <div className="flex flex-col">
               <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Public IP</span>
               <span className="text-purple-300 font-mono font-bold text-sm mt-1">
@@ -80,9 +80,15 @@ export default function UserActivityModal({ userId, onClose }: ActivityModalProp
               </span>
             </div>
             <div className="flex flex-col">
-              <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Region</span>
+              <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Location</span>
               <span className="text-white font-medium text-sm mt-1">
-                {activity.region && activity.region !== 'Unknown' && activity.region !== 'Local' ? activity.region : 'Location Unavailable'}
+                {activity.location || 'Location Unavailable'}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Source</span>
+              <span className="text-white font-medium text-sm mt-1 uppercase">
+                {activity.locationSource || 'IP'}
               </span>
             </div>
             <div className="flex flex-col">

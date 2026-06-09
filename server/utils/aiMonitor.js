@@ -1,6 +1,7 @@
 const SuspiciousActivity = require('../models/SuspiciousActivity');
 const User = require('../models/User');
 const { getLocationInfo, logSuspiciousActivity, SCORING } = require('./securityService');
+const { formatLocationText } = require('./suspiciousLocationMonitor');
 
 // Track failed attempts in memory for quick rate limiting / detection
 // In production, use Redis
@@ -58,29 +59,29 @@ const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata
     }
     
     // Update user location for next check
-    let formattedLocation = 'Location Unavailable';
-    if (location && location.city && location.country && 
-        location.city !== 'Unknown' && location.country !== 'Unknown' && 
-        location.city !== 'Local' && location.country !== 'Local' && 
-        location.city !== 'Localhost') {
-      formattedLocation = `${location.city}, ${location.country}`;
-    }
-    await User.findOneAndUpdate({ username }, { location: formattedLocation });
+    const formattedLocation = formatLocationText(location);
+    await User.findOneAndUpdate({ username }, { 
+      location: formattedLocation,
+      district: location.district,
+      state: location.state,
+      locationSource: location.locationSource,
+      ipAddress
+    });
   }
 
   // Log to general ActivityLog for the "System Logs" tab
   const ActivityLog = require('../models/ActivityLog');
-  let formattedLogLocation = 'Location Unavailable';
-  if (location && location.city && location.country && 
-      location.city !== 'Unknown' && location.country !== 'Unknown' && 
-      location.city !== 'Local' && location.country !== 'Local' && 
-      location.city !== 'Localhost') {
-    formattedLogLocation = `${location.city}, ${location.country}`;
-  }
+  const formattedLogLocation = formatLocationText(location);
   await ActivityLog.create({
     username: username || 'anonymous',
     ipAddress,
     location: formattedLogLocation,
+    district: location.district,
+    state: location.state,
+    country: location.country,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    locationSource: location.locationSource,
     activityType: actionType,
     status: 'normal'
   });
@@ -106,19 +107,22 @@ const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata
     // Clear old attempts after 15 mins
     setTimeout(() => failedAttempts.delete(key), 15 * 60 * 1000);
 
-    // NEW: Repeated Failed Login Detection for SecurityAlert
-    const nowMs = Date.now();
-    if (!failedLoginHistory.has(username)) {
-      failedLoginHistory.set(username, []);
-    }
-    const history = failedLoginHistory.get(username);
-    // Remove attempts older than 30 minutes
-    const updatedHistory = history.filter(item => nowMs - item.timestamp < 30 * 60 * 1000);
-    updatedHistory.push({ timestamp: nowMs, ipAddress });
-    failedLoginHistory.set(username, updatedHistory);
+    // NEW: Count failed logins in MongoDB
+    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const thirtyMinsAgo = new Date(Date.now() - 30 * 60 * 1000);
 
-    const last15Mins = updatedHistory.filter(item => nowMs - item.timestamp < 15 * 60 * 1000).length;
-    const last30Mins = updatedHistory.length;
+    const [failed15, failed30] = await Promise.all([
+      ActivityLog.countDocuments({
+        username,
+        activityType: 'login_failed',
+        timestamp: { $gte: fifteenMinsAgo }
+      }),
+      ActivityLog.countDocuments({
+        username,
+        activityType: 'login_failed',
+        timestamp: { $gte: thirtyMinsAgo }
+      })
+    ]);
 
     let severity = null;
     let score = 0;
@@ -126,18 +130,18 @@ const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata
     let timeWindowMinutes = 0;
     let alertDescription = '';
 
-    if (last30Mins > 5) {
+    if (failed30 === 5) {
       severity = 'Critical';
       score = 100;
-      attemptCount = last30Mins;
+      attemptCount = failed30;
       timeWindowMinutes = 30;
-      alertDescription = `More than 5 failed login attempts within 30 minutes: ${last30Mins} attempts detected.`;
-    } else if (last15Mins > 3) {
+      alertDescription = `Failed login attempts threshold reached: ${failed30} attempts within 30 minutes.`;
+    } else if (failed15 === 3) {
       severity = 'Medium';
       score = 40;
-      attemptCount = last15Mins;
+      attemptCount = failed15;
       timeWindowMinutes = 15;
-      alertDescription = `More than 3 failed login attempts within 15 minutes: ${last15Mins} attempts detected.`;
+      alertDescription = `Failed login attempts threshold reached: ${failed15} attempts within 15 minutes.`;
     }
 
     if (severity) {
@@ -155,8 +159,12 @@ const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata
         severity,
         score,
         ipAddress,
+        location: formatLocationText(geo),
         country: geo.country,
         city: geo.city,
+        district: geo.district,
+        state: geo.state,
+        locationSource: geo.locationSource,
         latitude: geo.latitude,
         longitude: geo.longitude,
         attemptCount,
@@ -331,8 +339,12 @@ const checkRegistrationLinkSecurity = async (event, reqIp, requestUser) => {
         severity: a.severity,
         score: a.score,
         ipAddress: reqIp,
+        location: formatLocationText(geo),
         country: geo.country,
         city: geo.city,
+        district: geo.district,
+        state: geo.state,
+        locationSource: geo.locationSource,
         latitude: geo.latitude,
         longitude: geo.longitude,
         metadata: {
