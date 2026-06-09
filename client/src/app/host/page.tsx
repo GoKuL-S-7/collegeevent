@@ -1,6 +1,7 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { CheckCircle2 } from 'lucide-react';
 
 export default function HostEvent() {
   const router = useRouter();
@@ -98,7 +99,9 @@ export default function HostEvent() {
     return (
       <div className="min-h-[calc(100vh-4rem)] flex items-center justify-center p-4">
         <div className="glass-panel p-12 rounded-3xl text-center max-w-md border border-green-500/30">
-          <div className="text-6xl mb-4">🎉</div>
+          <div className="flex justify-center mb-4">
+            <CheckCircle2 className="w-16 h-16 text-green-400" />
+          </div>
           <h2 className="text-2xl font-bold text-green-400 mb-2">Event Submitted!</h2>
           <p className="text-gray-400">Your event is under review by our admin team. You will be redirected shortly.</p>
         </div>

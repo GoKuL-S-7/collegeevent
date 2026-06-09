@@ -1,5 +1,10 @@
 "use client";
 import { useState, useEffect, useCallback } from "react";
+import { 
+  Shield, Globe, Plane, Lock, RefreshCw, Laptop, Activity, Zap, MapPin, 
+  AlertTriangle, Link, ShieldAlert, AlertCircle, Key, Users, Check, X,
+  ClipboardList, Info
+} from 'lucide-react';
 
 // ─── Types (preserved) ───────────────────────────────────────────────────────
 interface SecurityAlert {
@@ -51,16 +56,24 @@ function RiskBadge({ level }: { level: string }) {
 }
 
 // ─── Alert icon map ───────────────────────────────────────────────────────────
-const ALERT_ICONS: Record<string, string> = {
-  COUNTRY_CHANGE:      "🌍",
-  IMPOSSIBLE_TRAVEL:   "✈️",
-  VPN_DETECTED:        "🔒",
-  TOR_DETECTED:        "🧅",
-  MULTIPLE_IP_CHANGES: "🔄",
-  NEW_DEVICE:          "💻",
-  NEW_USER_AGENT:      "🌐",
-  BRUTE_FORCE:         "⚡",
-  SUSPICIOUS_LOCATION: "📍",
+const ALERT_ICONS: Record<string, React.ComponentType<any>> = {
+  COUNTRY_CHANGE:      Globe,
+  IMPOSSIBLE_TRAVEL:   Plane,
+  VPN_DETECTED:        Lock,
+  TOR_DETECTED:        ShieldAlert,
+  MULTIPLE_IP_CHANGES: RefreshCw,
+  NEW_DEVICE:          Laptop,
+  NEW_USER_AGENT:      Activity,
+  BRUTE_FORCE:         Zap,
+  SUSPICIOUS_LOCATION: MapPin,
+  FAILED_LOGIN_ATTEMPTS: Key,
+  MULTIPLE_ACCOUNTS_SAME_IP: Users,
+  MALICIOUS_LINK_DETECTED: ShieldAlert,
+  LOCALHOST_LINK_SUBMITTED: Laptop,
+  URL_SHORTENER_USED: Link,
+  NON_HTTPS_REGISTRATION_URL: AlertTriangle,
+  DOMAIN_MISMATCH: AlertCircle,
+  BLACKLISTED_DOMAIN: ShieldAlert
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -152,7 +165,8 @@ export default function AIMonitorDashboard() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            🛡️ AI Security Monitor
+            <Shield className="w-5 h-5 text-purple-400" />
+            AI Security Monitor
           </h2>
           <p className="text-gray-500 text-xs mt-0.5">
             Real-time threat detection · Polling every 30 s · Last updated{" "}
@@ -282,7 +296,12 @@ export default function AIMonitorDashboard() {
                     <td className="px-6 py-4">
                       <div className="flex flex-col">
                         <span className="text-white font-bold text-sm flex items-center gap-2">
-                          <span>{ALERT_ICONS[alert.alertType] ?? "🚨"}</span>
+                          <span className="text-purple-400 flex items-center">
+                            {(() => {
+                              const IconComponent = ALERT_ICONS[alert.alertType] || AlertCircle;
+                              return <IconComponent className="w-4 h-4" />;
+                            })()}
+                          </span>
                           {alert.alertType.replace(/_/g, " ")}
                         </span>
                         <span className="text-purple-400 text-xs mt-0.5">
@@ -377,8 +396,9 @@ export default function AIMonitorDashboard() {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           {/* Description */}
                           <div>
-                            <h4 className="text-purple-400 font-bold text-xs uppercase tracking-widest mb-3">
-                              🔍 Alert Detail
+                            <h4 className="text-purple-400 font-bold text-xs uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                              <Info className="w-4 h-4" />
+                              Alert Detail
                             </h4>
                             <p className="text-white text-sm leading-relaxed">
                               {alert.description}
@@ -393,8 +413,9 @@ export default function AIMonitorDashboard() {
 
                           {/* Location detail */}
                           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                            <h4 className="text-purple-400 font-bold text-xs uppercase tracking-widest mb-3">
-                              📍 Location Data
+                            <h4 className="text-purple-400 font-bold text-xs uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                              <MapPin className="w-4 h-4" />
+                              Location Data
                             </h4>
                             <div className="space-y-2 text-xs">
                               <div className="flex justify-between">
@@ -429,8 +450,9 @@ export default function AIMonitorDashboard() {
 
                           {/* Metadata */}
                           <div className="bg-white/5 rounded-xl p-4 border border-white/10">
-                            <h4 className="text-purple-400 font-bold text-xs uppercase tracking-widest mb-3">
-                              📋 Extra Context
+                            <h4 className="text-purple-400 font-bold text-xs uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                              <ClipboardList className="w-4 h-4" />
+                              Extra Context
                             </h4>
                             {alert.metadata &&
                             Object.keys(alert.metadata).length > 0 ? (

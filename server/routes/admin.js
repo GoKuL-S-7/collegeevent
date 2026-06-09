@@ -3,6 +3,7 @@ const User = require('../models/User');
 const Event = require('../models/Event');
 const ActivityLog = require('../models/ActivityLog');
 const { auth, isAdmin } = require('../middleware/auth');
+const { checkRegistrationLinkSecurity } = require('../utils/aiMonitor');
 const router = express.Router();
 
 router.use(auth, isAdmin);
@@ -90,6 +91,11 @@ router.put('/events/:id', async (req, res) => {
     }
     const event = await Event.findByIdAndUpdate(req.params.id, { status }, { new: true });
     if (!event) return res.status(404).json({ error: 'Event not found' });
+
+    if (status === 'approved') {
+      checkRegistrationLinkSecurity(event, req.ip, req.user).catch(err => console.error("Link analysis error:", err));
+    }
+
     res.json({ message: `Event ${status} successfully`, event });
   } catch (error) {
     res.status(500).json({ error: error.message });

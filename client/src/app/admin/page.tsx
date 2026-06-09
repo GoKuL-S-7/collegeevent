@@ -5,6 +5,7 @@ import UserActivityModal from "@/components/UserActivityModal";
 import SecurityDashboard from "@/components/SecurityDashboard";
 import AIMonitorDashboard from "@/components/AIMonitorDashboard";
 import DeleteConfirmationModal from "@/components/DeleteConfirmationModal";
+import { Shield, Trash2, Calendar, Search } from 'lucide-react';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -152,8 +153,9 @@ export default function AdminDashboard() {
         <button onClick={() => setActiveTab("users")} className={`px-6 py-2 rounded-full font-medium transition-colors ${activeTab === 'users' ? 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
           Users ({users.length})
         </button>
-        <button onClick={() => setActiveTab("security")} className={`px-6 py-2 rounded-full font-medium transition-colors ${activeTab === 'security' ? 'bg-red-600 text-white' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'}`}>
-          🛡️ AI Monitoring
+        <button onClick={() => setActiveTab("security")} className={`px-6 py-2 rounded-full font-medium transition-colors flex items-center gap-2 ${activeTab === 'security' ? 'bg-red-600 text-white' : 'bg-red-500/10 text-red-400 hover:bg-red-500/20'}`}>
+          <Shield className="w-4 h-4" />
+          AI Monitoring
         </button>
         <button onClick={() => setActiveTab("logs")} className={`px-6 py-2 rounded-full font-medium transition-colors ${activeTab === 'logs' ? 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
           System Logs
@@ -168,29 +170,45 @@ export default function AdminDashboard() {
             {pendingEvents.length === 0 ? (
               <p className="text-gray-400 text-center py-8">No pending events to review.</p>
             ) : (
-              pendingEvents.map((event) => (
-                <div key={event._id} className="bg-[#1a1a2e] rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center border border-white/5 hover:border-purple-500/30 transition-colors">
-                  <div className="mb-4 md:mb-0">
-                    <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                      {event.title}
-                      <span className="bg-purple-500/20 text-purple-300 text-xs px-2 py-1 rounded capitalize">{event.category}</span>
-                    </h3>
-                    <p className="text-gray-400 text-sm mt-1">{event.collegeName} • {new Date(event.dateTime).toLocaleDateString()}</p>
-                    <p className="text-gray-500 text-sm mt-2 line-clamp-2 max-w-2xl">{event.description}</p>
+              pendingEvents.map((event) => {
+                const posterSrc = event.posterUrl
+                  ? (event.posterUrl.startsWith('http')
+                    ? event.posterUrl
+                    : `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl.startsWith('/') ? event.posterUrl : '/' + event.posterUrl}`)
+                  : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+
+                return (
+                  <div key={event._id} className="bg-[#1a1a2e] rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center border border-white/5 hover:border-purple-500/30 transition-colors">
+                    <div className="flex gap-4 items-center mb-4 md:mb-0">
+                      <img 
+                        src={posterSrc}
+                        alt={event.title}
+                        className="w-16 h-16 object-cover rounded-lg border border-white/10 flex-shrink-0"
+                      />
+                      <div>
+                        <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                          {event.title}
+                          <span className="bg-purple-500/20 text-purple-300 text-xs px-2 py-1 rounded capitalize">{event.category}</span>
+                        </h3>
+                        <p className="text-gray-400 text-sm mt-1">{event.collegeName} • {new Date(event.dateTime).toLocaleDateString()}</p>
+                        <p className="text-gray-500 text-sm mt-2 line-clamp-2 max-w-2xl">{event.description}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-3 w-full md:w-auto">
+                      <button onClick={() => handleEventAction(event._id, 'approved')} className="flex-1 md:flex-none bg-green-500/20 text-green-400 hover:bg-green-500/30 px-6 py-2 rounded-lg font-medium transition-colors border border-green-500/30">
+                        Approve
+                      </button>
+                      <button onClick={() => handleEventAction(event._id, 'rejected')} className="flex-1 md:flex-none bg-red-500/20 text-red-400 hover:bg-red-500/30 px-6 py-2 rounded-lg font-medium transition-colors border border-red-500/30 text-sm">
+                        Reject
+                      </button>
+                      <button onClick={() => setDeletingEvent(event)} className="flex-1 md:flex-none bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white px-4 py-2 rounded-lg font-bold transition-all border border-red-600/30 text-xs flex items-center gap-1.5 justify-center">
+                        <Trash2 className="w-3.5 h-3.5" />
+                        Delete
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-3 w-full md:w-auto">
-                    <button onClick={() => handleEventAction(event._id, 'approved')} className="flex-1 md:flex-none bg-green-500/20 text-green-400 hover:bg-green-500/30 px-6 py-2 rounded-lg font-medium transition-colors border border-green-500/30">
-                      Approve
-                    </button>
-                    <button onClick={() => handleEventAction(event._id, 'rejected')} className="flex-1 md:flex-none bg-red-500/20 text-red-400 hover:bg-red-500/30 px-6 py-2 rounded-lg font-medium transition-colors border border-red-500/30 text-sm">
-                      Reject
-                    </button>
-                    <button onClick={() => setDeletingEvent(event)} className="flex-1 md:flex-none bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white px-4 py-2 rounded-lg font-bold transition-all border border-red-600/30 text-xs">
-                      🗑️ Delete
-                    </button>
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
@@ -201,30 +219,49 @@ export default function AdminDashboard() {
             {allEvents.length === 0 ? (
               <p className="text-gray-400 text-center py-8">No events found in the system.</p>
             ) : (
-              allEvents.map((event) => (
-                <div key={event._id} className="bg-[#1a1a2e] rounded-xl p-6 border border-white/5 hover:border-purple-500/30 transition-colors flex justify-between items-center">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-bold text-white">{event.title}</h3>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                        event.status === 'approved' ? 'bg-green-500/20 text-green-400' : 
-                        event.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 
-                        'bg-red-500/20 text-red-400'
-                      }`}>
-                        {event.status}
-                      </span>
+              allEvents.map((event) => {
+                const posterSrc = event.posterUrl
+                  ? (event.posterUrl.startsWith('http')
+                    ? event.posterUrl
+                    : `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl.startsWith('/') ? event.posterUrl : '/' + event.posterUrl}`)
+                  : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+
+                return (
+                  <div key={event._id} className="bg-[#1a1a2e] rounded-xl p-6 border border-white/5 hover:border-purple-500/30 transition-colors flex justify-between items-center">
+                    <div className="flex gap-4 items-center">
+                      <img 
+                        src={posterSrc}
+                        alt={event.title}
+                        className="w-12 h-12 object-cover rounded-lg border border-white/10 flex-shrink-0"
+                      />
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="text-lg font-bold text-white">{event.title}</h3>
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            event.status === 'approved' ? 'bg-green-500/20 text-green-400' : 
+                            event.status === 'pending' ? 'bg-yellow-500/20 text-yellow-400' : 
+                            'bg-red-500/20 text-red-400'
+                          }`}>
+                            {event.status}
+                          </span>
+                        </div>
+                        <p className="text-gray-400 text-xs">Host: <span className="text-white">{event.createdBy?.username || 'Unknown'}</span> • {event.collegeName}</p>
+                        <p className="text-gray-500 text-xs mt-1 flex items-center gap-1.5">
+                          <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                          {new Date(event.dateTime).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-gray-400 text-xs">Host: <span className="text-white">{event.createdBy?.username || 'Unknown'}</span> • {event.collegeName}</p>
-                    <p className="text-gray-500 text-xs mt-1">📅 {new Date(event.dateTime).toLocaleString()}</p>
+                    <button 
+                      onClick={() => setDeletingEvent(event)}
+                      className="bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white px-4 py-2 rounded-lg font-bold transition-all border border-red-500/30 text-xs flex items-center gap-1.5"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      Delete Globally
+                    </button>
                   </div>
-                  <button 
-                    onClick={() => setDeletingEvent(event)}
-                    className="bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white px-4 py-2 rounded-lg font-bold transition-all border border-red-500/30 text-xs"
-                  >
-                    🗑️ Delete Globally
-                  </button>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         )}
@@ -234,7 +271,9 @@ export default function AdminDashboard() {
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row gap-4 justify-between mb-6">
               <div className="relative flex-1">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 flex items-center">
+                  <Search className="w-4 h-4" />
+                </span>
                 <input 
                   type="text" 
                   placeholder="Search by username..." 

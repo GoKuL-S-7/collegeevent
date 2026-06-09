@@ -5,6 +5,7 @@ const { getLocationInfo, logSuspiciousActivity, SCORING } = require('./securityS
 // Track failed attempts in memory for quick rate limiting / detection
 // In production, use Redis
 const failedAttempts = new Map();
+const failedLoginHistory = new Map(); // username -> array of { timestamp, ipAddress }
 const actionTimestamps = new Map();
 
 const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata = {}) => {
@@ -90,6 +91,65 @@ const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata
 
     // Clear old attempts after 15 mins
     setTimeout(() => failedAttempts.delete(key), 15 * 60 * 1000);
+
+    // NEW: Repeated Failed Login Detection for SecurityAlert
+    const nowMs = Date.now();
+    if (!failedLoginHistory.has(username)) {
+      failedLoginHistory.set(username, []);
+    }
+    const history = failedLoginHistory.get(username);
+    // Remove attempts older than 30 minutes
+    const updatedHistory = history.filter(item => nowMs - item.timestamp < 30 * 60 * 1000);
+    updatedHistory.push({ timestamp: nowMs, ipAddress });
+    failedLoginHistory.set(username, updatedHistory);
+
+    const last15Mins = updatedHistory.filter(item => nowMs - item.timestamp < 15 * 60 * 1000).length;
+    const last30Mins = updatedHistory.length;
+
+    let severity = null;
+    let score = 0;
+    let attemptCount = 0;
+
+    if (last30Mins === 10) {
+      severity = 'Critical';
+      score = 100;
+      attemptCount = 10;
+    } else if (last15Mins === 5) {
+      severity = 'High';
+      score = 75;
+      attemptCount = 5;
+    } else if (last15Mins === 3) {
+      severity = 'Medium';
+      score = 40;
+      attemptCount = 3;
+    }
+
+    if (severity) {
+      const SecurityAlert = require('../models/SecurityAlert');
+      const { getGeoInfo } = require('./suspiciousLocationMonitor');
+      
+      const user = await User.findOne({ username });
+      const geo = await getGeoInfo(ipAddress);
+
+      await SecurityAlert.create({
+        userId: user ? user._id : undefined,
+        username,
+        alertType: 'FAILED_LOGIN_ATTEMPTS',
+        description: `Repeated failed login attempts: ${attemptCount} attempts detected.`,
+        severity,
+        score,
+        ipAddress,
+        country: geo.country,
+        city: geo.city,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        attemptCount,
+        metadata: {
+          attemptCount,
+          timeWindowMinutes: attemptCount === 10 ? 30 : 15
+        }
+      });
+    }
   }
 
   // FEATURE 4: Bulk Account Creation Detection
@@ -143,4 +203,179 @@ const trackActionFrequency = async (username, ipAddress, action) => {
   return false;
 };
 
-module.exports = { checkSuspiciousActivity, trackActionFrequency };
+const checkRegistrationLinkSecurity = async (event, reqIp, requestUser) => {
+  const { registrationLink, collegeName, title, createdBy } = event;
+  if (!registrationLink) return;
+
+  const alertsToCreate = [];
+  let parsedUrl;
+  try {
+    parsedUrl = new URL(registrationLink);
+  } catch (e) {
+    return;
+  }
+
+  const hostname = parsedUrl.hostname.toLowerCase();
+  const protocol = parsedUrl.protocol.toLowerCase();
+
+  // 1. Blacklisted / Phishing
+  const blacklist = ['malicious-site.com', 'scam-events.org', 'phish-login.net'];
+  const phishingPatterns = [/phishing/i, /scam/i, /malware/i, /free-money/i, /adult-content/i];
+  
+  const isBlacklistedDomain = blacklist.includes(hostname) || blacklist.some(d => hostname.endsWith('.' + d));
+  const isPhishingPattern = phishingPatterns.some(pattern => pattern.test(registrationLink));
+
+  if (isBlacklistedDomain) {
+    alertsToCreate.push({
+      alertType: 'BLACKLISTED_DOMAIN',
+      description: `Event "${title}" registration link matches blacklisted domain: ${hostname}`,
+      severity: 'Critical',
+      score: 100
+    });
+  } else if (isPhishingPattern) {
+    alertsToCreate.push({
+      alertType: 'MALICIOUS_LINK_DETECTED',
+      description: `Event "${title}" registration link contains known phishing patterns`,
+      severity: 'Critical',
+      score: 100
+    });
+  }
+
+  // 2. Raw IP address URLs
+  const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+  const isRawIp = ipRegex.test(hostname);
+  if (isRawIp) {
+    if (hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+      alertsToCreate.push({
+        alertType: 'LOCALHOST_LINK_SUBMITTED',
+        description: `Event "${title}" registration link points to localhost/loopback IP: ${hostname}`,
+        severity: 'High',
+        score: 75
+      });
+    } else {
+      alertsToCreate.push({
+        alertType: 'MALICIOUS_LINK_DETECTED',
+        description: `Event "${title}" registration link uses a raw IP address: ${hostname}`,
+        severity: 'Critical',
+        score: 100
+      });
+    }
+  } else if (hostname === 'localhost') {
+    alertsToCreate.push({
+      alertType: 'LOCALHOST_LINK_SUBMITTED',
+      description: `Event "${title}" registration link points to localhost`,
+      severity: 'High',
+      score: 75
+    });
+  }
+
+  // 3. URL shorteners
+  const shorteners = ['bit.ly', 'tinyurl.com', 't.ly', 'shorturl.at'];
+  const isShortener = shorteners.includes(hostname) || shorteners.some(d => hostname.endsWith('.' + d));
+  if (isShortener) {
+    alertsToCreate.push({
+      alertType: 'URL_SHORTENER_USED',
+      description: `Event "${title}" registration link uses a URL shortener: ${hostname}`,
+      severity: 'Medium',
+      score: 40
+    });
+  }
+
+  // 4. Non HTTPS links
+  if (protocol === 'http:') {
+    alertsToCreate.push({
+      alertType: 'NON_HTTPS_REGISTRATION_URL',
+      description: `Event "${title}" registration link uses non-secure HTTP protocol: ${registrationLink}`,
+      severity: 'Medium',
+      score: 40
+    });
+  }
+
+  // 5. Suspicious domain mismatch between institution name and registration URL
+  if (!isRawIp && hostname !== 'localhost' && !isShortener) {
+    const TRUSTED_DOMAINS = [
+      'gov.in', 'edu.in', 'ac.in', 'res.in', 'nic.in', 'ernet.in',
+      'google.com', 'forms.gle', 'microsoft.com', 'outlook.com',
+      'github.com', 'eventbrite.com', 'townscript.com', 'unstop.com',
+      'iitm.ac.in', 'annauniv.edu', 'nptel.ac.in', 'vit.ac.in', 'bits-pilani.ac.in'
+    ];
+    
+    const isTrustedPublic = TRUSTED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
+    
+    if (!isTrustedPublic) {
+      const cleanCollege = collegeName.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length >= 3 && !['college', 'university', 'institute', 'technology', 'science', 'and', 'the', 'engineering', 'of'].includes(w));
+      
+      const acronym = collegeName.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .map(w => w[0])
+        .join('');
+      
+      let matched = false;
+      if (acronym.length >= 3 && hostname.includes(acronym)) {
+        matched = true;
+      }
+      for (const word of cleanCollege) {
+        if (hostname.includes(word)) {
+          matched = true;
+          break;
+        }
+      }
+
+      if (!matched && cleanCollege.length > 0) {
+        alertsToCreate.push({
+          alertType: 'DOMAIN_MISMATCH',
+          description: `Event "${title}" registration link domain (${hostname}) does not match institution name (${collegeName})`,
+          severity: 'Medium',
+          score: 40
+        });
+      }
+    }
+  }
+
+  if (alertsToCreate.length > 0) {
+    let alertUser = requestUser?.username;
+    let alertUserId = requestUser?.userId;
+
+    if (!alertUser && createdBy) {
+      const creator = await User.findById(createdBy);
+      if (creator) {
+        alertUser = creator.username;
+        alertUserId = creator._id;
+      }
+    }
+
+    alertUser = alertUser || 'unknown';
+
+    const SecurityAlert = require('../models/SecurityAlert');
+    const { getGeoInfo } = require('./suspiciousLocationMonitor');
+    const geo = await getGeoInfo(reqIp);
+
+    for (const a of alertsToCreate) {
+      await SecurityAlert.create({
+        userId: alertUserId,
+        username: alertUser,
+        alertType: a.alertType,
+        description: a.description,
+        severity: a.severity,
+        score: a.score,
+        ipAddress: reqIp,
+        country: geo.country,
+        city: geo.city,
+        latitude: geo.latitude,
+        longitude: geo.longitude,
+        metadata: {
+          eventId: event._id,
+          eventTitle: title,
+          registrationLink,
+          collegeName
+        }
+      });
+    }
+  }
+};
+
+module.exports = { checkSuspiciousActivity, trackActionFrequency, checkRegistrationLinkSecurity };

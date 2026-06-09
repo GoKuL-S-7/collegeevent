@@ -229,6 +229,50 @@ async function monitorLogin({ userId, username, ip, userAgent = '', deviceFinger
       }
     }
 
+    // ── Rule 7: Same IP Multi-Account Detection ───────────────────────────
+    const twentyFourHoursAgo = new Date(now - 24 * 60 * 60 * 1000);
+    const uniqueUsersOnIP = await UserSession.distinct('username', {
+      ipAddress: ip,
+      loginTime: { $gte: twentyFourHoursAgo }
+    });
+    
+    if (!uniqueUsersOnIP.includes(username)) {
+      uniqueUsersOnIP.push(username);
+    }
+
+    if (uniqueUsersOnIP.length >= 3) {
+      const severity = uniqueUsersOnIP.length >= 5 ? 'High' : 'Medium';
+      const score = severity === 'High' ? 75 : 40;
+      
+      const fiveMinutesAgo = new Date(now - 5 * 60 * 1000);
+      const existingAlert = await SecurityAlert.findOne({
+        ipAddress: ip,
+        alertType: 'MULTIPLE_ACCOUNTS_SAME_IP',
+        createdAt: { $gte: fiveMinutesAgo }
+      });
+
+      if (!existingAlert) {
+        await SecurityAlert.create({
+          userId,
+          username,
+          sessionId: session._id,
+          alertType: 'MULTIPLE_ACCOUNTS_SAME_IP',
+          description: `Multiple accounts (${uniqueUsersOnIP.join(', ')}) logged in from same IP (${ip}) within 24 hours`,
+          severity,
+          score,
+          ipAddress: ip,
+          country: geo.country,
+          city: geo.city,
+          latitude: geo.latitude,
+          longitude: geo.longitude,
+          metadata: {
+            affectedUsers: uniqueUsersOnIP,
+            attemptCount: uniqueUsersOnIP.length
+          }
+        });
+      }
+    }
+
     return { session, totalScore, alerts };
   } catch (err) {
     console.error('[SecurityMonitor] Error:', err.message);

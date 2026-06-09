@@ -16,7 +16,15 @@ const securityAlertSchema = new mongoose.Schema({
       'NEW_DEVICE',
       'NEW_USER_AGENT',
       'BRUTE_FORCE',
-      'SUSPICIOUS_LOCATION'
+      'SUSPICIOUS_LOCATION',
+      'FAILED_LOGIN_ATTEMPTS',
+      'MULTIPLE_ACCOUNTS_SAME_IP',
+      'MALICIOUS_LINK_DETECTED',
+      'LOCALHOST_LINK_SUBMITTED',
+      'URL_SHORTENER_USED',
+      'NON_HTTPS_REGISTRATION_URL',
+      'DOMAIN_MISMATCH',
+      'BLACKLISTED_DOMAIN'
     ]
   },
   description: { type: String, required: true },
@@ -32,7 +40,8 @@ const securityAlertSchema = new mongoose.Schema({
   metadata:    { type: mongoose.Schema.Types.Mixed },
   resolved:    { type: Boolean, default: false },
   resolvedAt:  { type: Date },
-  createdAt:   { type: Date, default: Date.now }
+  createdAt:   { type: Date, default: Date.now },
+  attemptCount: { type: Number }
 });
 
 module.exports = mongoose.model('SecurityAlert', securityAlertSchema);

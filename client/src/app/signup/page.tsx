@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Check, X } from 'lucide-react';
 
 export default function Signup() {
   const router = useRouter();
@@ -110,9 +111,9 @@ export default function Signup() {
                 return (
                   <div key={rule.id} className="flex items-center gap-2">
                     {passed ? (
-                      <span className="text-green-400">✅</span>
+                      <Check className="w-4 h-4 text-green-400" />
                     ) : (
-                      <span className="text-red-400">❌</span>
+                      <X className="w-4 h-4 text-red-400" />
                     )}
                     <span className={passed ? "text-green-400" : "text-gray-400"}>{rule.label}</span>
                   </div>

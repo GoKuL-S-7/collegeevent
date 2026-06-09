@@ -5,6 +5,7 @@ import Link from "next/link";
 import EventCard from "@/components/EventCard";
 import EditEventModal from "@/components/EditEventModal";
 import DeleteConfirmationModal from "@/components/DeleteConfirmationModal";
+import { User, ClipboardList, Megaphone, Pencil, Trash2, CheckCircle, XCircle } from 'lucide-react';
 
 export default function UserProfile() {
   const router = useRouter();
@@ -128,7 +129,7 @@ export default function UserProfile() {
         <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
           <div>
             <h1 className="text-4xl font-bold text-white mb-2 flex items-center gap-3">
-              <span className="text-3xl">👤</span> {user?.username}'s Dashboard
+              <User className="w-8 h-8 text-purple-400" /> {user?.username}'s Dashboard
             </h1>
             <p className="text-gray-400">Track your event submissions and activities</p>
           </div>
@@ -158,12 +159,12 @@ export default function UserProfile() {
       <div className="space-y-12">
         <section>
           <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-            <span className="text-purple-500">📋</span> My Hosted Events
+            <ClipboardList className="w-6 h-6 text-purple-500" /> My Hosted Events
           </h2>
           
           {myEvents.length === 0 ? (
-            <div className="glass-panel p-12 rounded-3xl text-center border border-white/5">
-              <div className="text-5xl mb-4">📢</div>
+            <div className="glass-panel p-12 rounded-3xl text-center border border-white/5 flex flex-col items-center">
+              <Megaphone className="w-12 h-12 text-gray-600 mb-4" />
               <p className="text-gray-400 text-lg">You haven't hosted any events yet.</p>
               <Link href="/host" className="text-purple-400 hover:text-purple-300 mt-4 inline-block font-medium">
                 Start by hosting your first event →
@@ -197,15 +198,15 @@ export default function UserProfile() {
                       <div className="flex gap-2">
                         <button 
                           onClick={() => setEditingEvent(event)}
-                          className="px-3 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white border border-purple-500/30 transition-all font-bold"
+                          className="px-3 py-1.5 rounded-lg bg-purple-600/20 hover:bg-purple-600 text-purple-400 hover:text-white border border-purple-500/30 transition-all font-bold flex items-center gap-1.5"
                         >
-                          ✏️ Edit
+                          <Pencil className="w-3.5 h-3.5" /> Edit
                         </button>
                         <button 
                           onClick={() => setDeletingEvent(event)}
-                          className="px-3 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/20 transition-all font-bold"
+                          className="px-3 py-1.5 rounded-lg bg-red-600/10 hover:bg-red-600 text-red-400 hover:text-white border border-red-500/20 transition-all font-bold flex items-center gap-1.5"
                         >
-                          🗑️ Delete
+                          <Trash2 className="w-3.5 h-3.5" /> Delete
                         </button>
                       </div>
                     </div>
@@ -251,7 +252,9 @@ export default function UserProfile() {
           toast.type === 'success' ? 'bg-green-500/20 border-green-500/50 text-green-400' : 'bg-red-500/10 border-red-500/50 text-red-400'
         }`}>
           <div className="flex items-center gap-3">
-            <span className="text-xl">{toast.type === 'success' ? '✅' : '❌'}</span>
+            <span className="text-xl flex items-center">
+              {toast.type === 'success' ? <CheckCircle className="w-5 h-5 text-green-400" /> : <XCircle className="w-5 h-5 text-red-400" />}
+            </span>
             <span className="font-medium">{toast.message}</span>
           </div>
         </div>

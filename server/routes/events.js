@@ -2,7 +2,7 @@ const express = require('express');
 const Event = require('../models/Event');
 const Registration = require('../models/Registration');
 const { auth } = require('../middleware/auth');
-const { checkSuspiciousActivity } = require('../utils/aiMonitor');
+const { checkSuspiciousActivity, checkRegistrationLinkSecurity } = require('../utils/aiMonitor');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
@@ -144,6 +144,9 @@ router.post('/', auth, upload.single('poster'), async (req, res) => {
     const event = new Event(eventData);
     await event.save();
 
+    // Run link security analysis asynchronously
+    checkRegistrationLinkSecurity(event, req.ip, req.user).catch(err => console.error("Link analysis error:", err));
+
     const user = await User.findById(req.user.userId);
     if (user && user.role === 'user') {
       user.role = 'host';
@@ -276,6 +279,10 @@ router.put('/:id', auth, upload.single('poster'), async (req, res) => {
     }
 
     const updatedEvent = await Event.findByIdAndUpdate(req.params.id, updateData, { new: true });
+    
+    // Run link security analysis asynchronously
+    checkRegistrationLinkSecurity(updatedEvent, req.ip, req.user).catch(err => console.error("Link analysis error:", err));
+    
     res.json({ message: 'Event updated successfully. Pending re-approval.', event: updatedEvent });
   } catch (error) {
     res.status(500).json({ error: error.message });
