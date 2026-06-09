@@ -26,6 +26,30 @@ const userSchema = new mongoose.Schema({
   location: {
     type: String,
   },
+  ipAddress: {
+    type: String,
+    default: '',
+  },
+  country: {
+    type: String,
+    default: '',
+  },
+  region: {
+    type: String,
+    default: '',
+  },
+  city: {
+    type: String,
+    default: '',
+  },
+  latitude: {
+    type: Number,
+    default: 0,
+  },
+  longitude: {
+    type: Number,
+    default: 0,
+  },
   lastLogin: Date,
   createdAt: {
     type: Date,

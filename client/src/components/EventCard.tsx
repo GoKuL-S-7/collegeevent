@@ -26,11 +26,16 @@ export default function EventCard({ event }: EventProps) {
   const isFree = event.entryFee === 0;
   const isOnline = event.mode === 'online';
 
-  const posterSrc = event.posterUrl
-    ? (event.posterUrl.startsWith('http')
-      ? event.posterUrl
-      : `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl.startsWith('/') ? event.posterUrl : '/' + event.posterUrl}`)
-    : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+  const getPosterSrc = (url?: string) => {
+    if (!url) return 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+    if (url.startsWith('http')) return url;
+    const cleanPath = url.startsWith('/') ? url : '/' + url;
+    let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      baseUrl = 'http://localhost:5000';
+    }
+    return `${baseUrl}${cleanPath}`;
+  };
 
   return (
     <div className="group relative bg-[#1a1a2e]/60 backdrop-blur-md rounded-2xl border border-white/5 hover:border-purple-500/40 transition-all duration-400 overflow-hidden flex flex-col h-full shadow-lg hover:shadow-purple-500/10 hover:-translate-y-1">
@@ -43,8 +48,11 @@ export default function EventCard({ event }: EventProps) {
         <div className="absolute inset-0 bg-gradient-to-t from-[#1a1a2e] via-[#1a1a2e]/20 to-transparent z-10" />
 
         <img
-          src={posterSrc}
+          src={getPosterSrc(event.posterUrl)}
           alt={event.title}
+          onError={(e) => {
+            e.currentTarget.src = 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+          }}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
         />
 

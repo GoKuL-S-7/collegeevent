@@ -21,6 +21,17 @@ export default function AdminDashboard() {
   const [deletingEvent, setDeletingEvent] = useState<any>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
 
+  const getPosterSrc = (url?: string) => {
+    if (!url) return 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+    if (url.startsWith('http')) return url;
+    const cleanPath = url.startsWith('/') ? url : '/' + url;
+    let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+      baseUrl = 'http://localhost:5000';
+    }
+    return `${baseUrl}${cleanPath}`;
+  };
+
   useEffect(() => {
     const userStr = localStorage.getItem("user");
     if (!userStr) {
@@ -171,18 +182,15 @@ export default function AdminDashboard() {
               <p className="text-gray-400 text-center py-8">No pending events to review.</p>
             ) : (
               pendingEvents.map((event) => {
-                const posterSrc = event.posterUrl
-                  ? (event.posterUrl.startsWith('http')
-                    ? event.posterUrl
-                    : `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl.startsWith('/') ? event.posterUrl : '/' + event.posterUrl}`)
-                  : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
-
                 return (
                   <div key={event._id} className="bg-[#1a1a2e] rounded-xl p-6 flex flex-col md:flex-row justify-between items-start md:items-center border border-white/5 hover:border-purple-500/30 transition-colors">
                     <div className="flex gap-4 items-center mb-4 md:mb-0">
                       <img 
-                        src={posterSrc}
+                        src={getPosterSrc(event.posterUrl)}
                         alt={event.title}
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+                        }}
                         className="w-16 h-16 object-cover rounded-lg border border-white/10 flex-shrink-0"
                       />
                       <div>
@@ -220,18 +228,15 @@ export default function AdminDashboard() {
               <p className="text-gray-400 text-center py-8">No events found in the system.</p>
             ) : (
               allEvents.map((event) => {
-                const posterSrc = event.posterUrl
-                  ? (event.posterUrl.startsWith('http')
-                    ? event.posterUrl
-                    : `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl.startsWith('/') ? event.posterUrl : '/' + event.posterUrl}`)
-                  : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
-
                 return (
                   <div key={event._id} className="bg-[#1a1a2e] rounded-xl p-6 border border-white/5 hover:border-purple-500/30 transition-colors flex justify-between items-center">
                     <div className="flex gap-4 items-center">
                       <img 
-                        src={posterSrc}
+                        src={getPosterSrc(event.posterUrl)}
                         alt={event.title}
+                        onError={(e) => {
+                          e.currentTarget.src = 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+                        }}
                         className="w-12 h-12 object-cover rounded-lg border border-white/10 flex-shrink-0"
                       />
                       <div>

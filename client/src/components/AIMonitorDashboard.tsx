@@ -206,6 +206,98 @@ export default function AIMonitorDashboard() {
         </div>
       </div>
 
+      {/* ── Charts ───────────────────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-4">
+        {/* Alerts By Day */}
+        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/5">
+          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider">Alerts By Day</h3>
+          {stats?.dailyTrends && stats.dailyTrends.length > 0 ? (
+            <div className="flex items-end justify-between h-36 gap-2 pt-2">
+              {stats.dailyTrends.map((d) => {
+                const maxVal = Math.max(...stats.dailyTrends.map(x => x.count), 1);
+                const pct = (d.count / maxVal) * 100;
+                return (
+                  <div key={d._id} className="flex flex-col items-center flex-1 h-full justify-end group">
+                    <div className="text-[9px] text-purple-400 font-bold mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {d.count}
+                    </div>
+                    <div 
+                      className="w-full bg-gradient-to-t from-purple-600 to-pink-500 rounded-t-sm transition-all duration-500 hover:from-purple-500 hover:to-pink-400"
+                      style={{ height: `${pct}%`, minHeight: d.count > 0 ? '4px' : '0px' }}
+                    />
+                    <span className="text-[8px] text-gray-500 mt-2 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
+                      {d._id.substring(5)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-36 text-gray-600 text-xs">No trend data available</div>
+          )}
+        </div>
+
+        {/* Alerts By Country */}
+        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/5">
+          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider">Alerts By Country</h3>
+          {stats?.byCountry && stats.byCountry.length > 0 ? (
+            <div className="space-y-3 h-36 overflow-y-auto pr-1">
+              {stats.byCountry.map((c) => {
+                const maxVal = Math.max(...stats.byCountry.map(x => x.count), 1);
+                const pct = (c.count / maxVal) * 100;
+                return (
+                  <div key={c._id} className="space-y-1">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-gray-300 truncate max-w-[150px]">{c._id === 'Local' ? 'Localhost' : c._id}</span>
+                      <span className="text-purple-400 font-bold">{c.count}</span>
+                    </div>
+                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500" 
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-36 text-gray-600 text-xs">No country data available</div>
+          )}
+        </div>
+
+        {/* Top Risky Users */}
+        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/5">
+          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider">Top Risky Users</h3>
+          {stats?.topRiskyUsers && stats.topRiskyUsers.length > 0 ? (
+            <div className="space-y-3 h-36 overflow-y-auto pr-1">
+              {stats.topRiskyUsers.map((u) => {
+                const maxVal = Math.max(...stats.topRiskyUsers.map(x => x.totalScore), 1);
+                const pct = (u.totalScore / maxVal) * 100;
+                return (
+                  <div key={u._id} className="space-y-1">
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-red-400 truncate max-w-[120px]">@{u._id}</span>
+                      <span className="text-gray-400 text-[9px]">
+                        {u.alertCount} alerts · <span className="text-red-500 font-bold">{u.totalScore} pts</span>
+                      </span>
+                    </div>
+                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all duration-500" 
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-36 text-gray-600 text-xs">No user risk data available</div>
+          )}
+        </div>
+      </div>
+
       {/* ── Filters ──────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
         {/* Username search */}
@@ -250,13 +342,16 @@ export default function AIMonitorDashboard() {
       <div className="overflow-x-auto rounded-xl border border-white/10">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-white/10 text-gray-400 text-xs uppercase tracking-wider">
-              <th className="px-6 py-4">Activity / User</th>
-              <th className="px-6 py-4">Location / IP</th>
-              <th className="px-6 py-4">Risk Level</th>
-              <th className="px-6 py-4">Score</th>
-              <th className="px-6 py-4">Timestamp</th>
-              <th className="px-6 py-4">Action</th>
+            <tr className="bg-white/10 text-gray-400 text-[10px] uppercase tracking-wider">
+              <th className="px-4 py-3">Username</th>
+              <th className="px-4 py-3">IP Address</th>
+              <th className="px-4 py-3">Country</th>
+              <th className="px-4 py-3">City</th>
+              <th className="px-4 py-3">Alert Type</th>
+              <th className="px-4 py-3">Risk Score</th>
+              <th className="px-4 py-3">Severity</th>
+              <th className="px-4 py-3">Timestamp</th>
+              <th className="px-4 py-3">Status</th>
             </tr>
           </thead>
 
@@ -264,7 +359,7 @@ export default function AIMonitorDashboard() {
             {/* Loading */}
             {loading && (
               <tr>
-                <td colSpan={6} className="text-center py-12">
+                <td colSpan={9} className="text-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500 mx-auto" />
                 </td>
               </tr>
@@ -273,7 +368,7 @@ export default function AIMonitorDashboard() {
             {/* Empty */}
             {!loading && alerts.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-12 text-gray-500">
+                <td colSpan={9} className="text-center py-12 text-gray-500">
                   No suspicious activities detected.
                 </td>
               </tr>
@@ -292,65 +387,67 @@ export default function AIMonitorDashboard() {
                       setExpandedId(expandedId === alert._id ? null : alert._id)
                     }
                   >
-                    {/* Activity / User */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-white font-bold text-sm flex items-center gap-2">
-                          <span className="text-purple-400 flex items-center">
-                            {(() => {
-                              const IconComponent = ALERT_ICONS[alert.alertType] || AlertCircle;
-                              return <IconComponent className="w-4 h-4" />;
-                            })()}
-                          </span>
-                          {alert.alertType.replace(/_/g, " ")}
+                    {/* Username */}
+                    <td className="px-4 py-3 text-sm text-purple-400">
+                      @{alert.username}
+                    </td>
+
+                    {/* IP Address */}
+                    <td className="px-4 py-3 text-sm font-mono text-gray-300">
+                      {alert.ipAddress}
+                    </td>
+
+                    {/* Country */}
+                    <td className="px-4 py-3 text-sm text-gray-300">
+                      {alert.country && alert.country !== 'Unknown' && alert.country !== 'Local' ? alert.country : 'Location Unavailable'}
+                    </td>
+
+                    {/* City */}
+                    <td className="px-4 py-3 text-sm text-gray-300">
+                      {alert.city && alert.city !== 'Unknown' && alert.city !== 'Local' ? alert.city : 'Location Unavailable'}
+                    </td>
+
+                    {/* Alert Type */}
+                    <td className="px-4 py-3 text-sm text-white font-bold">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-purple-400 flex items-center">
+                          {(() => {
+                            const IconComponent = ALERT_ICONS[alert.alertType] || AlertCircle;
+                            return <IconComponent className="w-3.5 h-3.5" />;
+                          })()}
                         </span>
-                        <span className="text-purple-400 text-xs mt-0.5">
-                          @{alert.username}
-                        </span>
+                        {alert.alertType.replace(/_/g, " ")}
                       </div>
                     </td>
 
-                    {/* Location / IP */}
-                    <td className="px-6 py-4">
-                      <div className="flex flex-col">
-                        <span className="text-gray-300 text-sm">
-                          {[alert.city, alert.country].filter(Boolean).join(", ") ||
-                            "Unknown"}
-                        </span>
-                        <span className="text-gray-500 text-xs font-mono">
-                          {alert.ipAddress}
-                        </span>
-                      </div>
-                    </td>
-
-                    {/* Risk Level */}
-                    <td className="px-6 py-4">
-                      <RiskBadge level={alert.severity} />
-                    </td>
-
-                    {/* Score */}
-                    <td className="px-6 py-4">
+                    {/* Risk Score */}
+                    <td className="px-4 py-3 text-sm font-mono font-bold text-center">
                       <span
-                        className={`font-mono font-bold ${
+                        className={
                           alert.score >= 70
                             ? "text-red-400"
                             : alert.score >= 30
                             ? "text-yellow-400"
                             : "text-gray-400"
-                        }`}
+                        }
                       >
                         {alert.score}
                       </span>
                     </td>
 
+                    {/* Severity */}
+                    <td className="px-4 py-3 text-sm">
+                      <RiskBadge level={alert.severity} />
+                    </td>
+
                     {/* Timestamp */}
-                    <td className="px-6 py-4 text-xs text-gray-500 whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs text-gray-500 whitespace-nowrap">
                       {new Date(alert.createdAt).toLocaleString()}
                     </td>
 
-                    {/* Action */}
+                    {/* Status */}
                     <td
-                      className="px-6 py-4"
+                      className="px-4 py-3 text-sm"
                       onClick={e => e.stopPropagation()}
                     >
                       {!alert.resolved ? (
@@ -360,22 +457,13 @@ export default function AIMonitorDashboard() {
                             disabled={resolving === alert._id}
                             onClick={() => handleResolve(alert._id)}
                             title="Resolve"
-                            className="bg-green-500/10 hover:bg-green-500 text-green-400 hover:text-white p-2 rounded-lg transition-all border border-green-500/20 disabled:opacity-40"
+                            className="bg-green-500/10 hover:bg-green-500 text-green-400 hover:text-white px-2 py-1 rounded-md text-xs transition-all border border-green-500/20 disabled:opacity-40"
                           >
                             {resolving === alert._id ? (
                               <span className="animate-spin inline-block text-xs">↻</span>
                             ) : (
-                              "✓"
+                              "Resolve"
                             )}
-                          </button>
-                          {/* Ignore (also resolves on backend) */}
-                          <button
-                            disabled={resolving === alert._id}
-                            onClick={() => handleResolve(alert._id)}
-                            title="Ignore"
-                            className="bg-gray-500/10 hover:bg-gray-500 text-gray-400 hover:text-white p-2 rounded-lg transition-all border border-gray-500/20 disabled:opacity-40"
-                          >
-                            ✕
                           </button>
                         </div>
                       ) : (
@@ -392,7 +480,7 @@ export default function AIMonitorDashboard() {
                       key={`${alert._id}-detail`}
                       className="bg-black/40 border-l-4 border-purple-500"
                     >
-                      <td colSpan={6} className="p-6">
+                      <td colSpan={9} className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           {/* Description */}
                           <div>

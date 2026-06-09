@@ -30,41 +30,120 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 
 // ─── IP Geolocation ─────────────────────────────────────────────────────────
 async function getGeoInfo(ip) {
-  // Skip private/loopback IPs
-  if (!ip || /^(::1|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip)) {
+  let targetIp = ip;
+  
+  // If the IP is a local or private IP, try to discover our public IP using ipify
+  if (!targetIp || /^(::1|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(targetIp)) {
+    try {
+      const { data } = await axios.get('https://api.ipify.org?format=json', { timeout: 3000 });
+      if (data && data.ip) {
+        targetIp = data.ip;
+      }
+    } catch (err) {
+      // Ignore and use local IP
+    }
+  }
+
+  // Skip if still local
+  if (!targetIp || /^(::1|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)/.test(targetIp)) {
     return {
-      ip, country: 'Local', region: 'Local', city: 'Local',
-      latitude: 0, longitude: 0, org: '', vpn: false, proxy: false
+      ip: targetIp || '127.0.0.1',
+      country: 'Local',
+      region: 'Local',
+      city: 'Local',
+      latitude: 0,
+      longitude: 0,
+      org: '',
+      vpn: false,
+      proxy: false,
+      tor: false
     };
   }
 
+  const countryNames = {
+    IN: 'India',
+    US: 'United States',
+    GB: 'United Kingdom',
+    CA: 'Canada',
+    AU: 'Australia',
+    SG: 'Singapore',
+    DE: 'Germany',
+    FR: 'France',
+    JP: 'Japan'
+  };
+
+  const cleanCountryName = (c) => {
+    if (!c) return 'Unknown';
+    if (c.length === 2 && countryNames[c.toUpperCase()]) {
+      return countryNames[c.toUpperCase()];
+    }
+    return c;
+  };
+
+  // 1. Try ipapi.co
   try {
-    const { data } = await axios.get(`https://ipapi.co/${ip}/json/`, { timeout: 5000 });
-    if (data.error) throw new Error(data.reason);
-    return {
-      ip:        data.ip,
-      country:   data.country_name   || 'Unknown',
-      region:    data.region         || 'Unknown',
-      city:      data.city           || 'Unknown',
-      latitude:  data.latitude       || 0,
-      longitude: data.longitude      || 0,
-      org:       data.org            || '',
-      vpn:       false,   // ipapi.co free tier doesn't expose VPN flag
-      proxy:     false,
-    };
-  } catch {
-    return {
-      ip, country: 'Unknown', region: 'Unknown', city: 'Unknown',
-      latitude: 0, longitude: 0, org: '', vpn: false, proxy: false
-    };
+    const { data } = await axios.get(`https://ipapi.co/${targetIp}/json/`, { timeout: 4000 });
+    if (data && !data.error) {
+      return {
+        ip: data.ip || targetIp,
+        country: cleanCountryName(data.country_name),
+        region: data.region || 'Unknown',
+        city: data.city || 'Unknown',
+        latitude: data.latitude || 0,
+        longitude: data.longitude || 0,
+        org: data.org || '',
+        vpn: !!(data.security?.vpn || data.proxy || data.hosting),
+        proxy: !!(data.proxy || data.security?.proxy),
+        tor: !!(data.security?.tor || data.tor)
+      };
+    }
+  } catch (err) {
+    // Try fallback to ipinfo.io
   }
+
+  // 2. Try ipinfo.io
+  try {
+    const { data } = await axios.get(`https://ipinfo.io/${targetIp}/json`, { timeout: 4000 });
+    if (data && !data.error) {
+      const [lat, lon] = (data.loc || '0,0').split(',').map(Number);
+      return {
+        ip: data.ip || targetIp,
+        country: cleanCountryName(data.country),
+        region: data.region || 'Unknown',
+        city: data.city || 'Unknown',
+        latitude: lat || 0,
+        longitude: lon || 0,
+        org: data.org || '',
+        vpn: false,
+        proxy: false,
+        tor: false
+      };
+    }
+  } catch (err) {
+    // Ignore
+  }
+
+  return {
+    ip: targetIp,
+    country: 'Unknown',
+    region: 'Unknown',
+    city: 'Unknown',
+    latitude: 0,
+    longitude: 0,
+    org: '',
+    vpn: false,
+    proxy: false,
+    tor: false
+  };
 }
 
 // ─── Risk Calculation ────────────────────────────────────────────────────────
 const SCORE = {
   COUNTRY_CHANGE:       50,
-  IMPOSSIBLE_TRAVEL:    70,
+  IMPOSSIBLE_TRAVEL:    100,
   VPN_DETECTED:         40,
+  PROXY_DETECTED:       30,
+  TOR_DETECTED:         70,
   MULTIPLE_IP_CHANGES:  20,
   NEW_DEVICE:           10,
   NEW_USER_AGENT:       10,
@@ -91,7 +170,7 @@ function severityFromScore(score) {
  */
 async function monitorLogin({ userId, username, ip, userAgent = '', deviceFingerprint = '' }) {
   try {
-    const geo   = await getGeoInfo(ip);
+    const geo   = await module.exports.getGeoInfo(ip);
     const now   = new Date();
     const alerts = [];
     let totalScore = 0;
@@ -136,14 +215,34 @@ async function monitorLogin({ userId, username, ip, userAgent = '', deviceFinger
       }
     }
 
-    // ── Rule 3: VPN / proxy detected ────────────────────────────────────────
-    if (geo.vpn || geo.proxy || (geo.org && /vpn|proxy|hosting|cloud|datacenter/i.test(geo.org))) {
+    // ── Rule 3: VPN / proxy / TOR detected ────────────────────────────────────────
+    if (geo.vpn) {
       totalScore += SCORE.VPN_DETECTED;
       alerts.push({
         alertType:   'VPN_DETECTED',
-        description: `VPN/Proxy/Hosting network detected (ASN: ${geo.org})`,
+        description: `VPN network detected (ASN: ${geo.org || 'N/A'})`,
         score:       SCORE.VPN_DETECTED,
         factor:      'VPN_DETECTED',
+      });
+    }
+
+    if (geo.proxy || (geo.org && /proxy|hosting|cloud|datacenter/i.test(geo.org))) {
+      totalScore += SCORE.PROXY_DETECTED;
+      alerts.push({
+        alertType:   'PROXY_DETECTED',
+        description: `Proxy/Hosting network detected (ASN: ${geo.org || 'N/A'})`,
+        score:       SCORE.PROXY_DETECTED,
+        factor:      'PROXY_DETECTED',
+      });
+    }
+
+    if (geo.tor) {
+      totalScore += SCORE.TOR_DETECTED;
+      alerts.push({
+        alertType:   'TOR_DETECTED',
+        description: `TOR Exit Node detected (ASN: ${geo.org || 'N/A'})`,
+        score:       SCORE.TOR_DETECTED,
+        factor:      'TOR_DETECTED',
       });
     }
 
@@ -153,14 +252,23 @@ async function monitorLogin({ userId, username, ip, userAgent = '', deviceFinger
       userId,
       loginTime: { $gte: oneHourAgo }
     });
+    if (!recentIps.includes(ip)) {
+      recentIps.push(ip);
+    }
     if (recentIps.length > 3) {
+      const prevIp = lastSession ? lastSession.ipAddress : 'N/A';
       totalScore += SCORE.MULTIPLE_IP_CHANGES;
       alerts.push({
         alertType:   'MULTIPLE_IP_CHANGES',
         description: `${recentIps.length} distinct IP addresses used in the last hour`,
         score:       SCORE.MULTIPLE_IP_CHANGES,
         factor:      'MULTIPLE_IP_CHANGES',
-        metadata:    { ips: recentIps },
+        metadata:    { 
+          previousIp: prevIp,
+          currentIp: ip,
+          timestamp: now,
+          ips: recentIps 
+        },
       });
     }
 
@@ -207,26 +315,27 @@ async function monitorLogin({ userId, username, ip, userAgent = '', deviceFinger
       vpnDetected:       geo.vpn || geo.proxy,
     });
 
-    // ── Emit SecurityAlerts for score >= 30 ──────────────────────────────────
-    if (totalScore >= 30) {
-      const severity = severityFromScore(totalScore);
-      for (const a of alerts) {
-        await SecurityAlert.create({
-          userId,
-          username,
-          sessionId:   session._id,
-          alertType:   a.alertType,
-          description: a.description,
-          severity,
-          score:       a.score,
-          ipAddress:   ip,
-          country:     geo.country,
-          city:        geo.city,
-          latitude:    geo.latitude,
-          longitude:   geo.longitude,
-          metadata:    a.metadata || {},
-        });
-      }
+    // ── Emit SecurityAlerts for all detected alerts ──────────────────────────
+    for (const a of alerts) {
+      const isCriticalOverride = a.alertType === 'IMPOSSIBLE_TRAVEL';
+      const severity = isCriticalOverride ? 'Critical' : severityFromScore(a.score);
+      const scoreVal = isCriticalOverride ? 100 : a.score;
+
+      await SecurityAlert.create({
+        userId,
+        username,
+        sessionId:   session._id,
+        alertType:   a.alertType,
+        description: a.description,
+        severity,
+        score:       scoreVal,
+        ipAddress:   ip,
+        country:     geo.country,
+        city:        geo.city,
+        latitude:    geo.latitude,
+        longitude:   geo.longitude,
+        metadata:    a.metadata || {},
+      });
     }
 
     // ── Rule 7: Same IP Multi-Account Detection ───────────────────────────

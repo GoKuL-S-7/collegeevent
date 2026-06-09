@@ -97,7 +97,23 @@ router.post('/login', loginLimiter, async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
+    const { getGeoInfo } = require('../utils/suspiciousLocationMonitor');
+    const geo = await getGeoInfo(req.ip || req.headers['x-forwarded-for'] || '127.0.0.1');
+
+    user.ipAddress = geo.ip;
+    user.country = geo.country;
+    user.region = geo.region;
+    user.city = geo.city;
+    user.latitude = geo.latitude;
+    user.longitude = geo.longitude;
     user.lastLogin = new Date();
+    
+    if (geo.city === 'Unknown' || geo.country === 'Unknown' || geo.city === 'Local' || geo.country === 'Local') {
+      user.location = 'Location Unavailable';
+    } else {
+      user.location = `${geo.city}, ${geo.country}`;
+    }
+    
     await user.save();
 
     const token = jwt.sign({ userId: user._id, role: user.role, username: user.username }, process.env.JWT_SECRET || 'supersecretjwt', { expiresIn: '24h' });

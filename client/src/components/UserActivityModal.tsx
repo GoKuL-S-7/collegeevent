@@ -68,7 +68,43 @@ export default function UserActivityModal({ userId, onClose }: ActivityModalProp
         <h2 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
           <BarChart3 className="w-8 h-8 text-purple-400" /> User Activity
         </h2>
-        <p className="text-purple-400 font-medium mb-8">UserID: <span className="text-white">@{activity?.username}</span></p>
+        <p className="text-purple-400 font-medium mb-6">UserID: <span className="text-white">@{activity?.username}</span></p>
+
+        {/* Security Profile & Session Details */}
+        {activity && (
+          <div className="mb-8 bg-white/5 border border-white/10 rounded-2xl p-6 grid grid-cols-2 md:grid-cols-5 gap-4">
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Public IP</span>
+              <span className="text-purple-300 font-mono font-bold text-sm mt-1">
+                {activity.ipAddress && activity.ipAddress !== 'Unknown' ? activity.ipAddress : 'Location Unavailable'}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Region</span>
+              <span className="text-white font-medium text-sm mt-1">
+                {activity.region && activity.region !== 'Unknown' && activity.region !== 'Local' ? activity.region : 'Location Unavailable'}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Latitude</span>
+              <span className="text-white font-mono font-medium text-sm mt-1">
+                {activity.latitude && activity.latitude !== 0 ? activity.latitude.toFixed(4) : 'Location Unavailable'}
+              </span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Longitude</span>
+              <span className="text-white font-mono font-medium text-sm mt-1">
+                {activity.longitude && activity.longitude !== 0 ? activity.longitude.toFixed(4) : 'Location Unavailable'}
+              </span>
+            </div>
+            <div className="flex flex-col col-span-2 md:col-span-1">
+              <span className="text-gray-500 text-[10px] uppercase font-bold tracking-wider">Last Login</span>
+              <span className="text-white font-medium text-xs mt-1.5 leading-none">
+                {activity.lastLogin ? new Date(activity.lastLogin).toLocaleString() : 'N/A'}
+              </span>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Hosted Events */}

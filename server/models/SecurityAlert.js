@@ -11,6 +11,7 @@ const securityAlertSchema = new mongoose.Schema({
       'COUNTRY_CHANGE',
       'IMPOSSIBLE_TRAVEL',
       'VPN_DETECTED',
+      'PROXY_DETECTED',
       'TOR_DETECTED',
       'MULTIPLE_IP_CHANGES',
       'NEW_DEVICE',
@@ -24,7 +25,13 @@ const securityAlertSchema = new mongoose.Schema({
       'URL_SHORTENER_USED',
       'NON_HTTPS_REGISTRATION_URL',
       'DOMAIN_MISMATCH',
-      'BLACKLISTED_DOMAIN'
+      'BLACKLISTED_DOMAIN',
+      'LOCALHOST_LINK',
+      'PRIVATE_IP_LINK',
+      'RAW_IP_LINK',
+      'NON_HTTPS_LINK',
+      'SHORTENER_LINK',
+      'MULTIPLE_FAILED_LOGINS'
     ]
   },
   description: { type: String, required: true },

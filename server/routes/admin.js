@@ -40,7 +40,7 @@ router.patch('/users/:id/block', async (req, res) => {
 router.get('/users/:id/activity', async (req, res) => {
   try {
     const userId = req.params.id;
-    const user = await User.findById(userId).select('username');
+    const user = await User.findById(userId).select('username role ipAddress country region city latitude longitude lastLogin');
     if (!user) return res.status(404).json({ error: 'User not found' });
 
     const Registration = require('../models/Registration');

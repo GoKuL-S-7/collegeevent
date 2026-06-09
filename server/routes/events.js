@@ -59,9 +59,10 @@ const runSecurityAnalysis = async (req, eventData) => {
       }
     });
     
-    if (trustAnalysis.riskLevel === 'Critical' && trustAnalysis.anomalyScore >= 50) {
-      throw new Error('Security Alert: Registration link flagged as high-risk impersonation or unofficial domain.');
-    }
+    // Do NOT block event creation. Only flag and notify admins.
+    // if (trustAnalysis.riskLevel === 'Critical' && trustAnalysis.anomalyScore >= 50) {
+    //   throw new Error('Security Alert: Registration link flagged as high-risk impersonation or unofficial domain.');
+    // }
   }
   return trustAnalysis;
 };

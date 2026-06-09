@@ -135,11 +135,28 @@ export default function EventDetailsPage() {
               <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f1b] via-[#0f0f1b]/40 to-transparent z-10" />
               
               <div className="relative h-96 w-full">
-                <img 
-                  src={event.posterUrl ? (event.posterUrl.startsWith('http') ? event.posterUrl : `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl.startsWith('/') ? event.posterUrl : '/' + event.posterUrl}`) : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event'} 
-                  alt={event.title}
-                  className="absolute inset-0 w-full h-full object-cover opacity-60"
-                />
+                {(() => {
+                  const getPosterSrc = (url?: string) => {
+                    if (!url) return 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+                    if (url.startsWith('http')) return url;
+                    const cleanPath = url.startsWith('/') ? url : '/' + url;
+                    let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+                    if (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+                      baseUrl = 'http://localhost:5000';
+                    }
+                    return `${baseUrl}${cleanPath}`;
+                  };
+                  return (
+                    <img 
+                      src={getPosterSrc(event.posterUrl)} 
+                      alt={event.title}
+                      onError={(e) => {
+                        e.currentTarget.src = 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+                      }}
+                      className="absolute inset-0 w-full h-full object-cover opacity-60"
+                    />
+                  );
+                })()}
                 
                 <div className="absolute bottom-0 left-0 w-full p-10 z-20">
                   <div className="flex items-center gap-3 mb-6">

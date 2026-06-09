@@ -109,19 +109,21 @@ const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata
     let severity = null;
     let score = 0;
     let attemptCount = 0;
+    let timeWindowMinutes = 0;
+    let alertDescription = '';
 
-    if (last30Mins === 10) {
+    if (last30Mins > 5) {
       severity = 'Critical';
       score = 100;
-      attemptCount = 10;
-    } else if (last15Mins === 5) {
-      severity = 'High';
-      score = 75;
-      attemptCount = 5;
-    } else if (last15Mins === 3) {
+      attemptCount = last30Mins;
+      timeWindowMinutes = 30;
+      alertDescription = `More than 5 failed login attempts within 30 minutes: ${last30Mins} attempts detected.`;
+    } else if (last15Mins > 3) {
       severity = 'Medium';
       score = 40;
-      attemptCount = 3;
+      attemptCount = last15Mins;
+      timeWindowMinutes = 15;
+      alertDescription = `More than 3 failed login attempts within 15 minutes: ${last15Mins} attempts detected.`;
     }
 
     if (severity) {
@@ -134,8 +136,8 @@ const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata
       await SecurityAlert.create({
         userId: user ? user._id : undefined,
         username,
-        alertType: 'FAILED_LOGIN_ATTEMPTS',
-        description: `Repeated failed login attempts: ${attemptCount} attempts detected.`,
+        alertType: 'MULTIPLE_FAILED_LOGINS',
+        description: alertDescription,
         severity,
         score,
         ipAddress,
@@ -146,7 +148,7 @@ const checkSuspiciousActivity = async (username, ipAddress, actionType, metadata
         attemptCount,
         metadata: {
           attemptCount,
-          timeWindowMinutes: attemptCount === 10 ? 30 : 15
+          timeWindowMinutes
         }
       });
     }
@@ -220,61 +222,58 @@ const checkRegistrationLinkSecurity = async (event, reqIp, requestUser) => {
 
   // 1. Blacklisted / Phishing
   const blacklist = ['malicious-site.com', 'scam-events.org', 'phish-login.net'];
-  const phishingPatterns = [/phishing/i, /scam/i, /malware/i, /free-money/i, /adult-content/i];
+  const isBlacklisted = blacklist.includes(hostname) || blacklist.some(d => hostname.endsWith('.' + d));
   
-  const isBlacklistedDomain = blacklist.includes(hostname) || blacklist.some(d => hostname.endsWith('.' + d));
-  const isPhishingPattern = phishingPatterns.some(pattern => pattern.test(registrationLink));
-
-  if (isBlacklistedDomain) {
+  if (isBlacklisted) {
     alertsToCreate.push({
       alertType: 'BLACKLISTED_DOMAIN',
       description: `Event "${title}" registration link matches blacklisted domain: ${hostname}`,
       severity: 'Critical',
       score: 100
     });
-  } else if (isPhishingPattern) {
+  }
+
+  // 2. Localhost, Private IP, Raw IP Checks
+  const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+  const isRawIp = ipRegex.test(hostname);
+  
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' || hostname === '::1') {
     alertsToCreate.push({
-      alertType: 'MALICIOUS_LINK_DETECTED',
-      description: `Event "${title}" registration link contains known phishing patterns`,
+      alertType: 'LOCALHOST_LINK',
+      description: `Event "${title}" registration link points to localhost/loopback: ${hostname}`,
       severity: 'Critical',
       score: 100
     });
-  }
-
-  // 2. Raw IP address URLs
-  const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-  const isRawIp = ipRegex.test(hostname);
-  if (isRawIp) {
-    if (hostname === '127.0.0.1' || hostname === '0.0.0.0') {
+  } else if (isRawIp) {
+    const parts = hostname.split('.').map(Number);
+    const isPrivateIp = 
+      parts[0] === 10 ||
+      (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
+      (parts[0] === 192 && parts[1] === 168);
+    
+    if (isPrivateIp) {
       alertsToCreate.push({
-        alertType: 'LOCALHOST_LINK_SUBMITTED',
-        description: `Event "${title}" registration link points to localhost/loopback IP: ${hostname}`,
-        severity: 'High',
-        score: 75
+        alertType: 'PRIVATE_IP_LINK',
+        description: `Event "${title}" registration link points to private network IP: ${hostname}`,
+        severity: 'Critical',
+        score: 100
       });
     } else {
       alertsToCreate.push({
-        alertType: 'MALICIOUS_LINK_DETECTED',
+        alertType: 'RAW_IP_LINK',
         description: `Event "${title}" registration link uses a raw IP address: ${hostname}`,
         severity: 'Critical',
         score: 100
       });
     }
-  } else if (hostname === 'localhost') {
-    alertsToCreate.push({
-      alertType: 'LOCALHOST_LINK_SUBMITTED',
-      description: `Event "${title}" registration link points to localhost`,
-      severity: 'High',
-      score: 75
-    });
   }
 
   // 3. URL shorteners
-  const shorteners = ['bit.ly', 'tinyurl.com', 't.ly', 'shorturl.at'];
+  const shorteners = ['bit.ly', 'tinyurl.com', 't.ly', 'shorturl.at', 'bitly.com'];
   const isShortener = shorteners.includes(hostname) || shorteners.some(d => hostname.endsWith('.' + d));
   if (isShortener) {
     alertsToCreate.push({
-      alertType: 'URL_SHORTENER_USED',
+      alertType: 'SHORTENER_LINK',
       description: `Event "${title}" registration link uses a URL shortener: ${hostname}`,
       severity: 'Medium',
       score: 40
@@ -284,56 +283,11 @@ const checkRegistrationLinkSecurity = async (event, reqIp, requestUser) => {
   // 4. Non HTTPS links
   if (protocol === 'http:') {
     alertsToCreate.push({
-      alertType: 'NON_HTTPS_REGISTRATION_URL',
+      alertType: 'NON_HTTPS_LINK',
       description: `Event "${title}" registration link uses non-secure HTTP protocol: ${registrationLink}`,
-      severity: 'Medium',
-      score: 40
+      severity: 'High',
+      score: 75
     });
-  }
-
-  // 5. Suspicious domain mismatch between institution name and registration URL
-  if (!isRawIp && hostname !== 'localhost' && !isShortener) {
-    const TRUSTED_DOMAINS = [
-      'gov.in', 'edu.in', 'ac.in', 'res.in', 'nic.in', 'ernet.in',
-      'google.com', 'forms.gle', 'microsoft.com', 'outlook.com',
-      'github.com', 'eventbrite.com', 'townscript.com', 'unstop.com',
-      'iitm.ac.in', 'annauniv.edu', 'nptel.ac.in', 'vit.ac.in', 'bits-pilani.ac.in'
-    ];
-    
-    const isTrustedPublic = TRUSTED_DOMAINS.some(d => hostname === d || hostname.endsWith('.' + d));
-    
-    if (!isTrustedPublic) {
-      const cleanCollege = collegeName.toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .split(/\s+/)
-        .filter(w => w.length >= 3 && !['college', 'university', 'institute', 'technology', 'science', 'and', 'the', 'engineering', 'of'].includes(w));
-      
-      const acronym = collegeName.toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .split(/\s+/)
-        .map(w => w[0])
-        .join('');
-      
-      let matched = false;
-      if (acronym.length >= 3 && hostname.includes(acronym)) {
-        matched = true;
-      }
-      for (const word of cleanCollege) {
-        if (hostname.includes(word)) {
-          matched = true;
-          break;
-        }
-      }
-
-      if (!matched && cleanCollege.length > 0) {
-        alertsToCreate.push({
-          alertType: 'DOMAIN_MISMATCH',
-          description: `Event "${title}" registration link domain (${hostname}) does not match institution name (${collegeName})`,
-          severity: 'Medium',
-          score: 40
-        });
-      }
-    }
   }
 
   if (alertsToCreate.length > 0) {
