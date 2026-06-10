@@ -36,10 +36,10 @@ interface SecurityStats {
   high: number;
   medium: number;
   unresolved: number;
-  byType: { _id: string; count: number }[];
-  byCountry: { _id: string; count: number }[];
-  dailyTrends: { _id: string; count: number }[];
-  topRiskyUsers: { _id: string; totalScore: number; alertCount: number }[];
+  byType?: { _id: string; count: number }[];
+  byCountry?: { _id: string; count: number }[];
+  dailyTrends?: { _id: string; count: number }[];
+  topRiskyUsers?: { _id: string; totalScore: number; alertCount: number }[];
 }
 
 // ─── Risk Badge ───────────────────────────────────────────────────────────────
@@ -67,6 +67,51 @@ function RiskBadge({ level }: { level: string }) {
     </span>
   );
 }
+
+const CONTENT_ALERT_TYPES = [
+  'LOCALHOST_LINK',
+  'PRIVATE_IP_LINK',
+  'RAW_IP_LINK',
+  'NON_HTTPS_LINK',
+  'SHORTENED_LINK',
+  'MISSING_REGISTRATION_PAGE',
+  'INVALID_SSL_CERTIFICATE',
+  'MALICIOUS_DOMAIN',
+  'MALICIOUS_LINK_DETECTED',
+  'BLACKLISTED_DOMAIN',
+  'LOCALHOST_LINK_SUBMITTED',
+  'URL_SHORTENER_USED',
+  'NON_HTTPS_REGISTRATION_URL',
+  'DOMAIN_MISMATCH',
+  'SHORTENER_LINK',
+];
+
+const isContentThreat = (alertType: string): boolean => {
+  return CONTENT_ALERT_TYPES.includes(alertType);
+};
+
+const getThreatCategoryName = (alertType: string): string => {
+  if (alertType.startsWith('http://') || alertType.startsWith('https://') || alertType.includes('/') || alertType.includes('.')) {
+    return 'SUSPICIOUS LINK';
+  }
+  const mapping: Record<string, string> = {
+    LOCALHOST_LINK: 'LOCALHOST LINK',
+    PRIVATE_IP_LINK: 'PRIVATE IP LINK',
+    RAW_IP_LINK: 'RAW IP LINK',
+    NON_HTTPS_LINK: 'NON HTTPS LINK',
+    SHORTENED_LINK: 'SHORTENED LINK',
+    MISSING_REGISTRATION_PAGE: 'MISSING REGISTRATION PAGE',
+    INVALID_SSL_CERTIFICATE: 'INVALID SSL CERTIFICATE',
+    MALICIOUS_DOMAIN: 'MALICIOUS DOMAIN',
+    MALICIOUS_LINK_DETECTED: 'MALICIOUS LINK',
+    BLACKLISTED_DOMAIN: 'BLACKLISTED DOMAIN',
+    LOCALHOST_LINK_SUBMITTED: 'LOCALHOST LINK',
+    URL_SHORTENER_USED: 'SHORTENED LINK',
+    NON_HTTPS_REGISTRATION_URL: 'NON HTTPS LINK',
+    DOMAIN_MISMATCH: 'DOMAIN MISMATCH',
+  };
+  return mapping[alertType] || alertType.replace(/_/g, " ");
+};
 
 // ─── Alert icon map ───────────────────────────────────────────────────────────
 const ALERT_ICONS: Record<string, React.ComponentType<any>> = {
@@ -226,97 +271,7 @@ export default function AIMonitorDashboard() {
         </div>
       </div>
 
-      {/* ── Charts ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 my-4">
-        {/* Alerts By Day */}
-        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/5">
-          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider">Alerts By Day</h3>
-          {stats?.dailyTrends && stats.dailyTrends.length > 0 ? (
-            <div className="flex items-end justify-between h-36 gap-2 pt-2">
-              {stats.dailyTrends.map((d) => {
-                const maxVal = Math.max(...stats.dailyTrends.map(x => x.count), 1);
-                const pct = (d.count / maxVal) * 100;
-                return (
-                  <div key={d._id} className="flex flex-col items-center flex-1 h-full justify-end group">
-                    <div className="text-[9px] text-purple-400 font-bold mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      {d.count}
-                    </div>
-                    <div 
-                      className="w-full bg-gradient-to-t from-purple-600 to-pink-500 rounded-t-sm transition-all duration-500 hover:from-purple-500 hover:to-pink-400"
-                      style={{ height: `${pct}%`, minHeight: d.count > 0 ? '4px' : '0px' }}
-                    />
-                    <span className="text-[8px] text-gray-500 mt-2 whitespace-nowrap overflow-hidden text-ellipsis max-w-full">
-                      {d._id.substring(5)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-36 text-gray-600 text-xs">No trend data available</div>
-          )}
-        </div>
 
-        {/* Alerts By Country */}
-        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/5">
-          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider">Alerts By Country</h3>
-          {stats?.byCountry && stats.byCountry.length > 0 ? (
-            <div className="space-y-3 h-36 overflow-y-auto pr-1">
-              {stats.byCountry.map((c) => {
-                const maxVal = Math.max(...stats.byCountry.map(x => x.count), 1);
-                const pct = (c.count / maxVal) * 100;
-                return (
-                  <div key={c._id} className="space-y-1">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-gray-300 truncate max-w-[150px]">{c._id === 'Local' ? 'Localhost' : c._id}</span>
-                      <span className="text-purple-400 font-bold">{c.count}</span>
-                    </div>
-                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-500" 
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-36 text-gray-600 text-xs">No country data available</div>
-          )}
-        </div>
-
-        {/* Top Risky Users */}
-        <div className="glass-panel p-6 rounded-2xl border border-white/10 bg-white/5">
-          <h3 className="text-xs font-bold text-gray-400 mb-4 uppercase tracking-wider">Top Risky Users</h3>
-          {stats?.topRiskyUsers && stats.topRiskyUsers.length > 0 ? (
-            <div className="space-y-3 h-36 overflow-y-auto pr-1">
-              {stats.topRiskyUsers.map((u) => {
-                const maxVal = Math.max(...stats.topRiskyUsers.map(x => x.totalScore), 1);
-                const pct = (u.totalScore / maxVal) * 100;
-                return (
-                  <div key={u._id} className="space-y-1">
-                    <div className="flex justify-between text-[11px]">
-                      <span className="text-red-400 truncate max-w-[120px]">@{u._id}</span>
-                      <span className="text-gray-400 text-[9px]">
-                        {u.alertCount} alerts · <span className="text-red-500 font-bold">{u.totalScore} pts</span>
-                      </span>
-                    </div>
-                    <div className="w-full h-1.5 bg-white/5 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-gradient-to-r from-orange-500 to-red-500 rounded-full transition-all duration-500" 
-                        style={{ width: `${pct}%` }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-36 text-gray-600 text-xs">No user risk data available</div>
-          )}
-        </div>
-      </div>
 
       {/* ── Filters ──────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
@@ -366,7 +321,7 @@ export default function AIMonitorDashboard() {
               <th className="px-4 py-3">Username</th>
               <th className="px-4 py-3">IP / Event Name</th>
               <th className="px-4 py-3">Location / URL</th>
-              <th className="px-4 py-3">Alert Type</th>
+              <th className="px-4 py-3">Alert Type / Cause for Unusual Activity</th>
               <th className="px-4 py-3">Risk Score</th>
               <th className="px-4 py-3">Severity</th>
               <th className="px-4 py-3">Timestamp</th>
@@ -414,27 +369,33 @@ export default function AIMonitorDashboard() {
 
                     {/* IP / Event Name */}
                     <td className="px-4 py-3 text-sm text-gray-300">
-                      {alert.metadata?.eventTitle || alert.ipAddress}
+                      {isContentThreat(alert.alertType) 
+                        ? (alert.metadata?.eventTitle || "N/A") 
+                        : (alert.ipAddress || "N/A")}
                     </td>
 
                     {/* Location / URL */}
                     <td className="px-4 py-3 text-sm text-gray-300">
-                      {alert.metadata?.registrationLink ? (
-                        <a 
-                          href={alert.metadata.registrationLink} 
-                          target="_blank" 
-                          rel="noopener noreferrer" 
-                          className="text-purple-400 hover:underline max-w-[180px] truncate block"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {alert.metadata.registrationLink}
-                        </a>
+                      {isContentThreat(alert.alertType) ? (
+                        alert.metadata?.registrationLink ? (
+                          <a 
+                            href={alert.metadata.registrationLink} 
+                            target="_blank" 
+                            rel="noopener noreferrer" 
+                            className="text-purple-400 hover:underline max-w-[180px] truncate block"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {alert.metadata.registrationLink}
+                          </a>
+                        ) : (
+                          "N/A"
+                        )
                       ) : (
                         alert.location || 'Location Unavailable'
                       )}
                     </td>
 
-                    {/* Alert Type */}
+                    {/* Alert Type / Cause for Unusual Activity */}
                     <td className="px-4 py-3 text-sm text-white font-bold">
                       <div className="flex items-center gap-1.5">
                         <span className="text-purple-400 flex items-center">
@@ -443,7 +404,7 @@ export default function AIMonitorDashboard() {
                             return <IconComponent className="w-3.5 h-3.5" />;
                           })()}
                         </span>
-                        {alert.alertType.replace(/_/g, " ")}
+                        {getThreatCategoryName(alert.alertType)}
                       </div>
                     </td>
 

@@ -17,53 +17,12 @@ router.get('/stats', async (req, res) => {
       high,
       medium,
       unresolved,
-      byType,
-      byCountry,
-      dailyTrends,
-      topRiskyUsers,
     ] = await Promise.all([
       SecurityAlert.countDocuments(),
       SecurityAlert.countDocuments({ severity: 'Critical' }),
       SecurityAlert.countDocuments({ severity: 'High' }),
       SecurityAlert.countDocuments({ severity: 'Medium' }),
       SecurityAlert.countDocuments({ resolved: false }),
-
-      // Breakdown by alert type
-      SecurityAlert.aggregate([
-        { $group: { _id: '$alertType', count: { $sum: 1 } } },
-        { $sort: { count: -1 } }
-      ]),
-
-      // Breakdown by country
-      SecurityAlert.aggregate([
-        { $match: { country: { $ne: 'Unknown' } } },
-        { $group: { _id: '$country', count: { $sum: 1 } } },
-        { $sort: { count: -1 } },
-        { $limit: 10 }
-      ]),
-
-      // Daily alert counts – last 7 days
-      SecurityAlert.aggregate([
-        {
-          $match: {
-            createdAt: { $gte: new Date(Date.now() - 7 * 24 * 3600 * 1000) }
-          }
-        },
-        {
-          $group: {
-            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
-            count: { $sum: 1 }
-          }
-        },
-        { $sort: { _id: 1 } }
-      ]),
-
-      // Top 5 risky users
-      SecurityAlert.aggregate([
-        { $group: { _id: '$username', totalScore: { $sum: '$score' }, alertCount: { $sum: 1 } } },
-        { $sort: { totalScore: -1 } },
-        { $limit: 5 }
-      ]),
     ]);
 
     res.json({
@@ -72,10 +31,10 @@ router.get('/stats', async (req, res) => {
       high,
       medium,
       unresolved,
-      byType,
-      byCountry,
-      dailyTrends,
-      topRiskyUsers,
+      byType: [],
+      byCountry: [],
+      dailyTrends: [],
+      topRiskyUsers: [],
     });
   } catch (err) {
     res.status(500).json({ error: err.message });
