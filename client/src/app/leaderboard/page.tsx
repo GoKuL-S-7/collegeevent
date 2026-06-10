@@ -16,7 +16,16 @@ import {
   ArrowUpRight,
   Loader2
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+const getPosterSrc = (url?: string) => {
+  if (!url) return 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+  if (url.startsWith('http')) return url;
+  const cleanPath = url.startsWith('/') ? url : '/' + url;
+  let baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+  if (baseUrl.endsWith('/')) {
+    baseUrl = baseUrl.slice(0, -1);
+  }
+  return `${baseUrl}${cleanPath}`;
+};
 
 export default function LeaderboardPage() {
   const [events, setEvents] = useState<any[]>([]);
@@ -248,8 +257,11 @@ function LeaderboardPodiumCard({ event, rank, color, isWinner = false }: any) {
         <div className="relative mb-6 mt-4">
           <div className={`w-32 h-32 rounded-[32px] overflow-hidden border-4 ${isWinner ? 'border-yellow-500/50' : 'border-white/10'}`}>
             <img 
-              src={event.posterUrl ? `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl}` : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event'} 
+              src={getPosterSrc(event.posterUrl)} 
               alt={event.title}
+              onError={(e) => {
+                e.currentTarget.src = 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+              }}
               className="w-full h-full object-cover"
             />
           </div>
@@ -295,8 +307,11 @@ function LeaderboardListRow({ event, rank }: any) {
 
         <div className="w-20 h-20 md:w-16 md:h-16 rounded-2xl overflow-hidden border border-white/5 flex-shrink-0">
           <img 
-            src={event.posterUrl ? `${process.env.NEXT_PUBLIC_API_URL}${event.posterUrl}` : 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event'} 
+            src={getPosterSrc(event.posterUrl)} 
             alt={event.title}
+            onError={(e) => {
+              e.currentTarget.src = 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
+            }}
             className="w-full h-full object-cover"
           />
         </div>
