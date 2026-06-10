@@ -16,6 +16,7 @@ import {
   ArrowUpRight,
   Loader2
 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 const getPosterSrc = (url?: string) => {
   if (!url) return 'https://placehold.co/600x400/1a1a2e/ffffff?text=Event';
   if (url.startsWith('http')) return url;
