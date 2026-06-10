@@ -89,6 +89,30 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/campuscon
       }
       console.log('User role migration complete.');
     }
+
+    // Seed BlacklistDomain collection
+    const BlacklistDomain = require('./models/BlacklistDomain');
+    const defaultBlacklist = [
+      { domain: 'malicious-site.com', category: 'malware' },
+      { domain: 'scam-events.org', category: 'scam' },
+      { domain: 'phish-login.net', category: 'phishing' },
+      { domain: 'phishing-domain.com', category: 'phishing' },
+      { domain: 'malware-domain.com', category: 'malware' },
+      { domain: 'scam-domain.com', category: 'scam' }
+    ];
+    for (const item of defaultBlacklist) {
+      const exists = await BlacklistDomain.findOne({ domain: item.domain });
+      if (!exists) {
+        await BlacklistDomain.create(item);
+        console.log(`Seeded blacklisted domain: ${item.domain}`);
+      }
+    }
+
+    // Initialize daily link recheck cron job
+    const { startDailyRecheckCron } = require('./utils/aiMonitor');
+    startDailyRecheckCron();
+    console.log('Daily registration link verification cron initialized.');
+
   } catch (err) {
     console.error('Migration error:', err);
   }

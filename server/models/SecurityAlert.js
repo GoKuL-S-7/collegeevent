@@ -31,7 +31,11 @@ const securityAlertSchema = new mongoose.Schema({
       'RAW_IP_LINK',
       'NON_HTTPS_LINK',
       'SHORTENER_LINK',
-      'MULTIPLE_FAILED_LOGINS'
+      'MULTIPLE_FAILED_LOGINS',
+      'MISSING_REGISTRATION_PAGE',
+      'INVALID_SSL_CERTIFICATE',
+      'SHORTENED_LINK',
+      'MALICIOUS_DOMAIN'
     ]
   },
   description: { type: String, required: true },
@@ -47,6 +51,8 @@ const securityAlertSchema = new mongoose.Schema({
   locationSource: { type: String },
   latitude:    { type: Number },
   longitude:   { type: Number },
+  // Link validation status
+  validationStatus: { type: String, enum: ['VALID', 'WARNING', 'SUSPICIOUS', 'INVALID'] },
   // Extra context
   metadata:    { type: mongoose.Schema.Types.Mixed },
   resolved:    { type: Boolean, default: false },

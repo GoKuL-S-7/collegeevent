@@ -22,6 +22,11 @@ const eventSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
   lastEditedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  // Link validation fields
+  validationStatus: { type: String, enum: ['VALID', 'WARNING', 'SUSPICIOUS', 'INVALID'], default: 'VALID' },
+  httpStatusCode: { type: Number },
+  responseTime: { type: Number },
+  redirectCount: { type: Number }
 });
 
 module.exports = mongoose.model('Event', eventSchema);

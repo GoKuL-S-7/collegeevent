@@ -27,6 +27,7 @@ interface SecurityAlert {
   resolved: boolean;
   resolvedAt?: string;
   createdAt: string;
+  validationStatus?: "VALID" | "WARNING" | "SUSPICIOUS" | "INVALID";
 }
 
 interface SecurityStats {
@@ -47,6 +48,14 @@ const RISK_BADGE: Record<string, string> = {
   High:     "bg-orange-500/20 text-orange-400 border-orange-500/30",
   Medium:   "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
   Low:      "bg-blue-500/20 text-blue-400 border-blue-500/30",
+};
+
+// ─── Validation Status Badge ──────────────────────────────────────────────────
+const VALIDATION_BADGE: Record<string, string> = {
+  VALID:      "bg-green-500/20 text-green-400 border-green-500/30",
+  WARNING:    "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  SUSPICIOUS: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  INVALID:    "bg-red-500/20 text-red-400 border-red-500/30",
 };
 
 function RiskBadge({ level }: { level: string }) {
@@ -77,7 +86,14 @@ const ALERT_ICONS: Record<string, React.ComponentType<any>> = {
   URL_SHORTENER_USED: Link,
   NON_HTTPS_REGISTRATION_URL: AlertTriangle,
   DOMAIN_MISMATCH: AlertCircle,
-  BLACKLISTED_DOMAIN: ShieldAlert
+  BLACKLISTED_DOMAIN: ShieldAlert,
+  MISSING_REGISTRATION_PAGE: AlertTriangle,
+  INVALID_SSL_CERTIFICATE:   Lock,
+  SHORTENED_LINK:            Link,
+  MALICIOUS_DOMAIN:          ShieldAlert,
+  LOCALHOST_LINK:            Laptop,
+  PRIVATE_IP_LINK:           Lock,
+  NON_HTTPS_LINK:            AlertTriangle,
 };
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -348,12 +364,13 @@ export default function AIMonitorDashboard() {
           <thead>
             <tr className="bg-white/10 text-gray-400 text-[10px] uppercase tracking-wider">
               <th className="px-4 py-3">Username</th>
-              <th className="px-4 py-3">IP Address</th>
-              <th className="px-4 py-3">Location</th>
+              <th className="px-4 py-3">IP / Event Name</th>
+              <th className="px-4 py-3">Location / URL</th>
               <th className="px-4 py-3">Alert Type</th>
               <th className="px-4 py-3">Risk Score</th>
               <th className="px-4 py-3">Severity</th>
               <th className="px-4 py-3">Timestamp</th>
+              <th className="px-4 py-3">Validation</th>
               <th className="px-4 py-3">Status</th>
             </tr>
           </thead>
@@ -362,7 +379,7 @@ export default function AIMonitorDashboard() {
             {/* Loading */}
             {loading && (
               <tr>
-                <td colSpan={8} className="text-center py-12">
+                <td colSpan={9} className="text-center py-12">
                   <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-purple-500 mx-auto" />
                 </td>
               </tr>
@@ -371,7 +388,7 @@ export default function AIMonitorDashboard() {
             {/* Empty */}
             {!loading && alerts.length === 0 && (
               <tr>
-                <td colSpan={8} className="text-center py-12 text-gray-500">
+                <td colSpan={9} className="text-center py-12 text-gray-500">
                   No suspicious activities detected.
                 </td>
               </tr>
@@ -395,14 +412,26 @@ export default function AIMonitorDashboard() {
                       @{alert.username}
                     </td>
 
-                    {/* IP Address */}
-                    <td className="px-4 py-3 text-sm font-mono text-gray-300">
-                      {alert.ipAddress}
+                    {/* IP / Event Name */}
+                    <td className="px-4 py-3 text-sm text-gray-300">
+                      {alert.metadata?.eventTitle || alert.ipAddress}
                     </td>
 
-                    {/* Location */}
+                    {/* Location / URL */}
                     <td className="px-4 py-3 text-sm text-gray-300">
-                      {alert.location || 'Location Unavailable'}
+                      {alert.metadata?.registrationLink ? (
+                        <a 
+                          href={alert.metadata.registrationLink} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="text-purple-400 hover:underline max-w-[180px] truncate block"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {alert.metadata.registrationLink}
+                        </a>
+                      ) : (
+                        alert.location || 'Location Unavailable'
+                      )}
                     </td>
 
                     {/* Alert Type */}
@@ -443,6 +472,17 @@ export default function AIMonitorDashboard() {
                       {new Date(alert.createdAt).toLocaleString()}
                     </td>
 
+                    {/* Validation */}
+                    <td className="px-4 py-3 text-sm">
+                      {alert.validationStatus ? (
+                        <span className={`px-2 py-0.5 rounded border text-[10px] font-bold ${VALIDATION_BADGE[alert.validationStatus] || VALIDATION_BADGE.VALID}`}>
+                          {alert.validationStatus}
+                        </span>
+                      ) : (
+                        <span className="text-gray-600 text-xs">-</span>
+                      )}
+                    </td>
+
                     {/* Status */}
                     <td
                       className="px-4 py-3 text-sm"
@@ -478,7 +518,7 @@ export default function AIMonitorDashboard() {
                       key={`${alert._id}-detail`}
                       className="bg-black/40 border-l-4 border-purple-500"
                     >
-                      <td colSpan={8} className="p-6">
+                      <td colSpan={9} className="p-6">
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                           {/* Description */}
                           <div>

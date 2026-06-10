@@ -231,78 +231,170 @@ const checkRegistrationLinkSecurity = async (event, reqIp, requestUser) => {
   const { registrationLink, collegeName, title, createdBy } = event;
   if (!registrationLink) return;
 
-  const alertsToCreate = [];
+  const dns = require('dns').promises;
+  const axios = require('axios');
+  const BlacklistDomain = require('../models/BlacklistDomain');
+  const SecurityAlert = require('../models/SecurityAlert');
+  const User = require('../models/User');
+
   let parsedUrl;
   try {
     parsedUrl = new URL(registrationLink);
   } catch (e) {
+    event.validationStatus = 'INVALID';
+    event.httpStatusCode = null;
+    event.responseTime = 0;
+    event.redirectCount = 0;
+    await event.save().catch(() => {});
     return;
   }
 
   const hostname = parsedUrl.hostname.toLowerCase();
   const protocol = parsedUrl.protocol.toLowerCase();
-
-  // 1. Blacklisted / Phishing
-  const blacklist = ['malicious-site.com', 'scam-events.org', 'phish-login.net'];
-  const isBlacklisted = blacklist.includes(hostname) || blacklist.some(d => hostname.endsWith('.' + d));
   
-  if (isBlacklisted) {
+  let ip = '';
+  let status = null;
+  let responseTime = 0;
+  let redirectCount = 0;
+  let dnsFailed = false;
+  let timeout = false;
+  let pageContent = '';
+  let sslValid = true;
+  let hasSslError = false;
+  
+  const startTime = Date.now();
+
+  // 1. DNS Lookup
+  try {
+    const lookupResult = await dns.lookup(hostname);
+    ip = lookupResult.address;
+  } catch (err) {
+    dnsFailed = true;
+  }
+
+  // 2. HTTP/HTTPS Request
+  if (!dnsFailed) {
+    try {
+      const response = await axios.get(registrationLink, {
+        timeout: 5000,
+        maxRedirects: 10,
+        validateStatus: () => true, // resolve promise for any status code
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        }
+      });
+      responseTime = Date.now() - startTime;
+      status = response.status;
+      pageContent = typeof response.data === 'string' ? response.data : '';
+      if (response.request && response.request._redirectable) {
+        redirectCount = response.request._redirectable._redirectCount || 0;
+      }
+    } catch (err) {
+      responseTime = Date.now() - startTime;
+      if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+        timeout = true;
+      } else if (err.code === 'ENOTFOUND') {
+        dnsFailed = true;
+      } else if (err.message.includes('SSL') || err.message.includes('certificate') || err.code === 'EPROTO') {
+        hasSslError = true;
+        sslValid = false;
+      } else {
+        dnsFailed = true;
+      }
+    }
+  }
+
+  // 3. SSL check for HTTPS
+  if (protocol === 'https:' && !dnsFailed && !timeout && !hasSslError) {
+    const checkSslCertificate = require('./sslChecker');
+    const sslDetails = await checkSslCertificate(hostname);
+    if (!sslDetails.valid) {
+      sslValid = false;
+    }
+  }
+
+  // Determine validationStatus
+  let validationStatus = 'VALID';
+  if (dnsFailed || timeout || status === 404 || status === 410) {
+    validationStatus = 'INVALID';
+  } else if (status === 403 || status === 429) {
+    validationStatus = 'SUSPICIOUS';
+  } else if (status === 301 || status === 302 || redirectCount > 5) {
+    validationStatus = 'WARNING';
+  }
+
+  const alertsToCreate = [];
+
+  // Localhost check
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1' || hostname === '0.0.0.0') {
+    validationStatus = 'INVALID';
     alertsToCreate.push({
-      alertType: 'BLACKLISTED_DOMAIN',
-      description: `Event "${title}" registration link matches blacklisted domain: ${hostname}`,
+      alertType: 'LOCALHOST_LINK',
+      description: `Event "${title}" registration link points to localhost: ${hostname}`,
       severity: 'Critical',
       score: 100
     });
   }
 
-  // 2. Localhost, Private IP, Raw IP Checks
+  // Private IP check
   const ipRegex = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-  const isRawIp = ipRegex.test(hostname);
-  
-  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '0.0.0.0' || hostname === '::1') {
-    alertsToCreate.push({
-      alertType: 'LOCALHOST_LINK',
-      description: `Event "${title}" registration link points to localhost/loopback: ${hostname}`,
-      severity: 'Critical',
-      score: 100
-    });
-  } else if (isRawIp) {
+  if (ipRegex.test(hostname)) {
     const parts = hostname.split('.').map(Number);
     const isPrivateIp = 
       parts[0] === 10 ||
       (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) ||
       (parts[0] === 192 && parts[1] === 168);
-    
     if (isPrivateIp) {
+      validationStatus = 'INVALID';
       alertsToCreate.push({
         alertType: 'PRIVATE_IP_LINK',
-        description: `Event "${title}" registration link points to private network IP: ${hostname}`,
+        description: `Event "${title}" registration link points to private IP: ${hostname}`,
         severity: 'Critical',
-        score: 100
-      });
-    } else {
-      alertsToCreate.push({
-        alertType: 'RAW_IP_LINK',
-        description: `Event "${title}" registration link uses a raw IP address: ${hostname}`,
-        severity: 'Critical',
-        score: 100
+        score: 95
       });
     }
   }
 
-  // 3. URL shorteners
-  const shorteners = ['bit.ly', 'tinyurl.com', 't.ly', 'shorturl.at', 'bitly.com'];
-  const isShortener = shorteners.includes(hostname) || shorteners.some(d => hostname.endsWith('.' + d));
-  if (isShortener) {
+  // Malware domain check
+  const isMalicious = await BlacklistDomain.findOne({ domain: hostname });
+  if (isMalicious || ['malicious-site.com', 'scam-events.org', 'phish-login.net'].includes(hostname)) {
+    validationStatus = 'INVALID';
     alertsToCreate.push({
-      alertType: 'SHORTENER_LINK',
-      description: `Event "${title}" registration link uses a URL shortener: ${hostname}`,
-      severity: 'Medium',
-      score: 40
+      alertType: 'MALICIOUS_DOMAIN',
+      description: `Event "${title}" registration link matches blacklisted malicious domain: ${hostname}`,
+      severity: 'Critical',
+      score: 100
     });
   }
 
-  // 4. Non HTTPS links
+  // DNS / Timeout / HTTP Status Alerts
+  if (dnsFailed && !alertsToCreate.length) {
+    alertsToCreate.push({
+      alertType: 'MALICIOUS_LINK_DETECTED',
+      description: `Event "${title}" registration link DNS lookup failed: ${hostname}`,
+      severity: 'Critical',
+      score: 100
+    });
+  } else if (timeout && !alertsToCreate.length) {
+    alertsToCreate.push({
+      alertType: 'MALICIOUS_LINK_DETECTED',
+      description: `Event "${title}" registration link connection timed out`,
+      severity: 'Critical',
+      score: 100
+    });
+  }
+
+  // SSL Validation Alert
+  if (protocol === 'https:' && !sslValid) {
+    alertsToCreate.push({
+      alertType: 'INVALID_SSL_CERTIFICATE',
+      description: `Event "${title}" registration link has invalid or expired SSL certificate`,
+      severity: 'High',
+      score: 70
+    });
+  }
+
+  // Non-HTTPS Validation Alert
   if (protocol === 'http:') {
     alertsToCreate.push({
       alertType: 'NON_HTTPS_LINK',
@@ -312,6 +404,75 @@ const checkRegistrationLinkSecurity = async (event, reqIp, requestUser) => {
     });
   }
 
+  // Shortener Detection Alert
+  const shorteners = ['bit.ly', 'tinyurl', 'cutt.ly', 'shorturl'];
+  if (shorteners.some(s => hostname.includes(s))) {
+    alertsToCreate.push({
+      alertType: 'SHORTENED_LINK',
+      description: `Event "${title}" registration link uses a URL shortener: ${hostname}`,
+      severity: 'High',
+      score: 70
+    });
+  }
+
+  // Registration Page content check
+  if (validationStatus === 'VALID' || validationStatus === 'WARNING' || validationStatus === 'SUSPICIOUS') {
+    const indicators = [
+      'register',
+      'registration',
+      'sign up',
+      'apply now',
+      'event registration',
+      'participant form',
+      'google form',
+      'microsoft form',
+      'registration deadline'
+    ];
+    const formHosts = ['forms.gle', 'docs.google.com/forms', 'forms.office.com', 'forms.microsoft.com'];
+    const hasFormHost = formHosts.some(h => registrationLink.toLowerCase().includes(h));
+    
+    let containsIndicator = hasFormHost;
+    if (!containsIndicator && pageContent) {
+      const lowerContent = pageContent.toLowerCase();
+      containsIndicator = indicators.some(ind => lowerContent.includes(ind));
+    }
+
+    if (!containsIndicator) {
+      alertsToCreate.push({
+        alertType: 'MISSING_REGISTRATION_PAGE',
+        description: `Event "${title}" registration page is missing standard form indicators`,
+        severity: 'Medium',
+        score: 40
+      });
+    }
+  }
+
+  // Save validation status and details on event
+  event.validationStatus = validationStatus;
+  event.httpStatusCode = status;
+  event.responseTime = responseTime;
+  event.redirectCount = redirectCount;
+  await event.save();
+
+  // Clear existing alerts for this event's registration link to avoid duplication
+  await SecurityAlert.deleteMany({
+    'metadata.eventId': event._id,
+    alertType: { $in: [
+      'LOCALHOST_LINK',
+      'PRIVATE_IP_LINK',
+      'RAW_IP_LINK',
+      'NON_HTTPS_LINK',
+      'SHORTENER_LINK',
+      'BLACKLISTED_DOMAIN',
+      'MALICIOUS_LINK_DETECTED',
+      'MISSING_REGISTRATION_PAGE',
+      'INVALID_SSL_CERTIFICATE',
+      'SHORTENED_LINK',
+      'MALICIOUS_DOMAIN'
+    ] }
+  });
+
+  // Create new alerts
   if (alertsToCreate.length > 0) {
     let alertUser = requestUser?.username;
     let alertUserId = requestUser?.userId;
@@ -323,10 +484,8 @@ const checkRegistrationLinkSecurity = async (event, reqIp, requestUser) => {
         alertUserId = creator._id;
       }
     }
-
     alertUser = alertUser || 'unknown';
 
-    const SecurityAlert = require('../models/SecurityAlert');
     const { getGeoInfo } = require('./suspiciousLocationMonitor');
     const geo = await getGeoInfo(reqIp);
 
@@ -347,6 +506,7 @@ const checkRegistrationLinkSecurity = async (event, reqIp, requestUser) => {
         locationSource: geo.locationSource,
         latitude: geo.latitude,
         longitude: geo.longitude,
+        validationStatus,
         metadata: {
           eventId: event._id,
           eventTitle: title,
@@ -358,4 +518,27 @@ const checkRegistrationLinkSecurity = async (event, reqIp, requestUser) => {
   }
 };
 
-module.exports = { checkSuspiciousActivity, trackActionFrequency, checkRegistrationLinkSecurity };
+// Start daily recheck cron job
+const startDailyRecheckCron = () => {
+  // Recheck every 24 hours
+  setInterval(async () => {
+    try {
+      console.log('[AutoRecheck] Starting daily registration link verification...');
+      const Event = require('../models/Event');
+      const events = await Event.find({ status: { $in: ['approved', 'pending'] } });
+      for (const event of events) {
+        await checkRegistrationLinkSecurity(event, '127.0.0.1');
+      }
+      console.log('[AutoRecheck] Daily registration link verification complete.');
+    } catch (err) {
+      console.error('[AutoRecheck] Error during daily verification:', err);
+    }
+  }, 24 * 60 * 60 * 1000);
+};
+
+module.exports = { 
+  checkSuspiciousActivity, 
+  trackActionFrequency, 
+  checkRegistrationLinkSecurity,
+  startDailyRecheckCron
+};
